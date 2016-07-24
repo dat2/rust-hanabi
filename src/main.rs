@@ -62,6 +62,8 @@ fn main()
       }
       */
 
+      // Use the out channel to send messages back
+      out.send(Message::Text("hello".to_string()))
     }
   }).unwrap()
 }
