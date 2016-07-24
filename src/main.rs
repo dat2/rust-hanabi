@@ -2,64 +2,15 @@
 #![plugin(serde_macros)]
 
 extern crate ws;
-extern crate serde;
 extern crate serde_json;
+
+mod messages;
 
 use std::rc::Rc;
 use ws::{listen,Message,Sender};
+
+use messages::{JsonMessage,Event};
 use serde_json::{Value, Map};
-
-#[derive(Debug, PartialEq)]
-enum Event
-{
-  Init
-}
-
-impl serde::Serialize for Event
-{
-  fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
-    where S: serde::Serializer
-  {
-    let human_message = match self {
-      &Event::Init => "Init"
-    };
-
-    serializer.serialize_str(human_message)
-  }
-}
-
-impl serde::Deserialize for Event
-{
-  fn deserialize<D>(deserializer: &mut D) -> Result<Event, D::Error>
-    where D: serde::de::Deserializer
-  {
-
-    struct EventVisitor;
-    impl serde::de::Visitor for EventVisitor
-    {
-      type Value = Event;
-
-      fn visit_str<E>(&mut self, value: &str) -> Result<Event, E>
-        where E: serde::de::Error,
-      {
-        match value {
-          "Init" => Ok(Event::Init),
-          _ => Err(serde::de::Error::custom("Wrong event type"))
-        }
-      }
-    }
-
-    deserializer.deserialize(EventVisitor)
-  }
-}
-
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct JsonMessage
-{
-  event: Event,
-  data: Value
-}
 
 // cases we need to handle
 // intermittent client connections
