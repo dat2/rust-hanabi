@@ -43,10 +43,6 @@ fn main()
   // the main game state
   // let mut game = Game { players: vec![] };
 
-  let mut handlers = HashMap::new();
-  handlers.insert("hey".to_string(), handleHey);
-  let handlers = handlers;
-
   // the main server handler
   listen(bind, |out|
   {
