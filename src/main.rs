@@ -25,6 +25,7 @@ impl Deserialize for Event
     struct EventVisitor;
     impl serde::de::Visitor for EventVisitor
     {
+      type Value = Event;
       fn visit_str<E>(&mut self, value: &str) -> Result<Event, E>
         where E: serde::de::Error,
       {
