@@ -8,6 +8,7 @@ extern crate serde_json;
 use ws::{listen,Message,Sender};
 use serde_json::{Value, Map};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct JsonMessage
@@ -19,7 +20,7 @@ struct JsonMessage
 // cases we need to handle
 // intermittent client connections
 
-fn handleHey<'a>(v: &Value, out: &'a Sender) -> Result<(), ws::Error>
+fn handleHey<'a>(v: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
 {
   let mut map = Map::new();
   map.insert("test".to_string(), Value::I64(123));
@@ -44,26 +45,29 @@ fn main()
 
   let mut handlers = HashMap::new();
   handlers.insert("hey".to_string(), handleHey);
+  let handlers = handlers;
 
   // the main server handler
   listen(bind, |out|
   {
+    let out = Rc::new(out);
     move |msg: Message|
     {
+
       // parse the received message
       let json_string = msg.as_text().unwrap();
       let message: JsonMessage = serde_json::from_str(&json_string).unwrap();
       println!("Message received {:?}", message);
 
-      /*
-      match handlers.get(&message.event) {
-        Some(function) => function(&message.data, &out),
-        None => noHandlersFound()
+      match message.event.as_ref() {
+        "hey" => {
+          handleHey(&message.data, out.clone())
+        },
+        _ => {
+          noHandlersFound()
+        }
       }
-      */
 
-      // Use the out channel to send messages back
-      out.send(Message::Text("hello".to_string()))
     }
   }).unwrap()
 }
