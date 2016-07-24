@@ -5,9 +5,9 @@ extern crate ws;
 extern crate serde;
 extern crate serde_json;
 
-use ws::{listen,Message};
+use ws::{listen,Message,Sender};
 use serde_json::{Value, Map};
-use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct JsonMessage
@@ -19,20 +19,20 @@ struct JsonMessage
 // cases we need to handle
 // intermittent client connections
 
-// return a string to send back to the client
-fn handleHey(v: &Value) -> String
+fn handle_hey(v: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
 {
   let mut map = Map::new();
   map.insert("test".to_string(), Value::I64(123));
   let response = JsonMessage { event: "hey".to_string(), data: Value::Object(map) };
 
   // return the string to send
-  serde_json::to_string(&response).unwrap()
+  let response = serde_json::to_string(&response).unwrap();
+  out.send(response)
 }
 
-fn noHandlersFound() -> String {
+fn no_handlers_found() -> Result<(), ws::Error> {
   println!("No handler registered for this event!");
-  String::new()
+  Ok(())
 }
 
 fn main()
@@ -43,26 +43,26 @@ fn main()
   // the main game state
   // let mut game = Game { players: vec![] };
 
-  let mut handlers = HashMap::new();
-  handlers.insert("hey".to_string(), handleHey);
-
   // the main server handler
   listen(bind, |out|
   {
+    let out = Rc::new(out);
     move |msg: Message|
     {
+
       // parse the received message
       let json_string = msg.as_text().unwrap();
       let message: JsonMessage = serde_json::from_str(&json_string).unwrap();
       println!("Message received {:?}", message);
 
-      let response_string = match handlers.get(&message.event) {
-        Some(func) => func(&message.data),
-        None => noHandlersFound()
-      };
-
-      // TODO check if response_string is empty
-      out.send(Message::Text(response_string))
+      match message.event.as_ref() {
+        "hey" => {
+          handle_hey(&message.data, out.clone())
+        },
+        _ => {
+          no_handlers_found()
+        }
+      }
     }
   }).unwrap()
 }
