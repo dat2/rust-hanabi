@@ -7,10 +7,10 @@ import './base.scss';
 import Socket from './api/socket';
 const listener = new Socket('ws://localhost:3012');
 listener.on('connect', () => {
-  listener.on('hey', (data) => {
+  listener.on('Init', (data) => {
     console.log(data);
   });
-  listener.emit('hey', { test: "hi" });
+  listener.emit('Init', { test: "hi" });
 });
 
 ReactDOM.render(
