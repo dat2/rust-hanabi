@@ -5,26 +5,40 @@ extern crate ws;
 extern crate serde;
 extern crate serde_json;
 
-use ws::{listen,Message,Sender};
-use serde::{Deserialize, Deserializer};
-use serde_json::{Value, Map};
 use std::rc::Rc;
+use ws::{listen,Message,Sender};
+use serde_json::{Value, Map};
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq)]
 enum Event
 {
   Init
 }
 
-impl Deserialize for Event
+impl serde::Serialize for Event
+{
+  fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+    where S: serde::Serializer
+  {
+    let human_message = match self {
+      &Event::Init => "Init"
+    };
+
+    serializer.serialize_str(human_message)
+  }
+}
+
+impl serde::Deserialize for Event
 {
   fn deserialize<D>(deserializer: &mut D) -> Result<Event, D::Error>
-    where D: serde::Deserializer,
+    where D: serde::de::Deserializer
   {
 
     struct EventVisitor;
     impl serde::de::Visitor for EventVisitor
     {
+      type Value = Event;
+
       fn visit_str<E>(&mut self, value: &str) -> Result<Event, E>
         where E: serde::de::Error,
       {
@@ -38,6 +52,7 @@ impl Deserialize for Event
     deserializer.deserialize(EventVisitor)
   }
 }
+
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct JsonMessage
