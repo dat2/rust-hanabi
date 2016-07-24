@@ -1,0 +1,10 @@
+[package]
+name = "hanabi"
+version = "0.1.0"
+authors = ["Nicholas Dujay <ndujay05@ca.ibm.com>"]
+
+[dependencies]
+ws = "*"
+serde = "*"
+serde_macros = "*"
+serde_json = "*"
