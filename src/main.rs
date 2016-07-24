@@ -20,7 +20,7 @@ struct JsonMessage
 // cases we need to handle
 // intermittent client connections
 
-fn handleHey<'a>(v: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
+fn handleHey(v: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
 {
   let mut map = Map::new();
   map.insert("test".to_string(), Value::I64(123));
