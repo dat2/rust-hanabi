@@ -7,7 +7,6 @@ extern crate serde_json;
 
 use ws::{listen,Message,Sender};
 use serde_json::{Value, Map};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -20,17 +19,18 @@ struct JsonMessage
 // cases we need to handle
 // intermittent client connections
 
-fn handleHey(v: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
+fn handle_hey(v: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
 {
   let mut map = Map::new();
   map.insert("test".to_string(), Value::I64(123));
   let response = JsonMessage { event: "hey".to_string(), data: Value::Object(map) };
-  let response_string = serde_json::to_string(&response).unwrap();
 
-  out.send(response_string)
+  // return the string to send
+  let response = serde_json::to_string(&response).unwrap();
+  out.send(response)
 }
 
-fn noHandlersFound() -> Result<(), ws::Error> {
+fn no_handlers_found() -> Result<(), ws::Error> {
   println!("No handler registered for this event!");
   Ok(())
 }
@@ -57,13 +57,12 @@ fn main()
 
       match message.event.as_ref() {
         "hey" => {
-          handleHey(&message.data, out.clone())
+          handle_hey(&message.data, out.clone())
         },
         _ => {
-          noHandlersFound()
+          no_handlers_found()
         }
       }
-
     }
   }).unwrap()
 }
