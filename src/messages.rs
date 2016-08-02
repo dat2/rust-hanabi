@@ -3,6 +3,9 @@ extern crate serde_json;
 
 use serde_json::{Value};
 
+// event string names
+const INIT: &'static str = "Init";
+
 #[derive(Debug, PartialEq)]
 pub enum Event
 {
@@ -15,7 +18,7 @@ impl serde::Serialize for Event
     where S: serde::Serializer
   {
     let human_message = match self {
-      &Event::Init => "Init"
+      &Event::Init => INIT
     };
 
     serializer.serialize_str(human_message)
@@ -37,7 +40,7 @@ impl serde::Deserialize for Event
         where E: serde::de::Error,
       {
         match value {
-          "Init" => Ok(Event::Init),
+          INIT => Ok(Event::Init),
           _ => Err(serde::de::Error::custom("Wrong event type"))
         }
       }

@@ -5,7 +5,7 @@ import './base.scss';
 
 // rust socket :)
 import Socket from './api/socket';
-const listener = new Socket('ws://localhost:3012');
+const listener = new Socket(`ws://${process.env.BIND}`);
 listener.on('connect', () => {
   listener.on('Init', (data) => {
     console.log(data);

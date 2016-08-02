@@ -3,6 +3,7 @@ var autoprefixer = require('autoprefixer');
 var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var ExtractTextPlugin = require('extract-text-webpack-plugin');
+var DotenvPlugin = require('webpack-dotenv-plugin');
 
 // TODO: hide this behind a flag and eliminate dead code on eject.
 // This shouldn't be exposed to the user.
@@ -84,6 +85,10 @@ module.exports = {
     return [autoprefixer];
   },
   plugins: [
+    new DotenvPlugin({
+      sample: '../.env.default',
+      path: '../.env'
+    }),
     new HtmlWebpackPlugin({
       inject: true,
       template: indexHtmlPath,

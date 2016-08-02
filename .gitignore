@@ -3,3 +3,7 @@ target
 
 # client stuff
 node_modules
+npm-debug.log
+
+# 12factor app files
+.env

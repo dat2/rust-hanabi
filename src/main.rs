@@ -1,16 +1,21 @@
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
+#![plugin(dotenv_macros)]
 
-extern crate ws;
+// import external
+extern crate serde;
 extern crate serde_json;
+extern crate ws;
+extern crate dotenv;
 
+// import local
 mod messages;
 
+use dotenv::dotenv;
 use std::rc::Rc;
 use ws::{listen,Message,Sender};
-
-use messages::{JsonMessage,Event};
 use serde_json::{Value, Map};
+use messages::{JsonMessage,Event};
 
 // cases we need to handle
 // intermittent client connections
@@ -29,8 +34,11 @@ fn handle_init(v: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
 
 fn main()
 {
+  dotenv().ok();
+
   // the listener address
-  let bind = "127.0.0.1:3012";
+  let bind = dotenv!("BIND");
+  println!("{}", dotenv!("BIND"));
 
   // the main server handler
   listen(bind, |out|
