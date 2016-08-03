@@ -1,6 +1,7 @@
-
+use std::cell::Cell;
+use chrono::*;
 use rand::{thread_rng, Rng};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Colour
@@ -16,7 +17,7 @@ pub enum Colour
 pub struct Card
 {
   colour: Colour,
-  number: u64
+  number: usize
 }
 
 pub type PlayerId = u64;
@@ -31,16 +32,15 @@ pub struct GameState
 
 impl GameState
 {
-  pub fn new(max_card_num: u64, n_players: u64) -> GameState
+  pub fn new(max_card_num: usize) -> GameState
   {
     let mut g = GameState { deck: Vec::new(), hands: BTreeMap::new(), current_turn: 0 };
     g.gen_deck(max_card_num);
     g.shuffle_deck();
-    g.init_players(n_players);
     g
   }
 
-  fn gen_deck(&mut self, max_card_num: u64)
+  fn gen_deck(&mut self, max_card_num: usize)
   {
     for x in 1..max_card_num+1 {
       self.deck.push(Card { colour: Colour::White, number: x });
@@ -58,10 +58,84 @@ impl GameState
     rng.shuffle(&mut self.deck);
   }
 
-  fn init_players(&mut self, n_players: u64)
+  fn init_players(&mut self, players: Vec<&PlayerId>)
   {
-    for p in 0..n_players {
-      self.hands.insert(p.to_string(), Vec::new());
+    for id in players {
+      self.hands.insert(id.to_string(), Vec::new());
     }
+  }
+
+  fn deal_cards(&mut self, n_cards: usize)
+  {
+    let keys = self.hands.keys().cloned().collect::<Vec<_>>();
+
+    for key in keys.iter().cycle().take(keys.len() * n_cards) {
+      self.hands.get_mut(key).unwrap().push(self.deck.pop().unwrap());
+    }
+  }
+}
+
+pub type ChannelName = String;
+
+#[derive(Debug)]
+pub struct Player
+{
+  name: String
+}
+
+#[derive(Debug)]
+pub struct Message
+{
+  text: String,
+  timestamp: DateTime<UTC>
+}
+
+#[derive(Debug)]
+pub struct Channel
+{
+  pub next_player_id: Cell<PlayerId>,
+  pub players: HashMap<PlayerId, Player>,
+  pub chat: Vec<Message>,
+  pub game_state: GameState
+}
+
+impl Channel
+{
+  pub fn new() -> Channel
+  {
+    Channel
+    {
+      next_player_id: Cell::new(0),
+      players: HashMap::new(),
+      chat: Vec::new(),
+      game_state: GameState::new(5)
+    }
+  }
+
+  pub fn has_player_with_name(&self, name: String) -> bool
+  {
+    self.players.values().fold(false, |found, player| found || player.name == name)
+  }
+
+  pub fn add_player(&mut self, name: String)
+  {
+    // TODO generate JSON web token?
+    self.players.insert(self.next_player_id.get(), Player { name: name });
+    self.next_player_id.set(self.next_player_id.get() + 1);
+  }
+
+  // TODO remove player?
+
+  pub fn add_message(&mut self, text: String)
+  {
+    self.chat.push(Message { text: text, timestamp: UTC::now() });
+  }
+
+  pub fn start_game(&mut self)
+  {
+    let player_ids = self.players.keys().collect::<Vec<_>>();
+    self.game_state.init_players(player_ids);
+    // deal 4 cards to each player
+    self.game_state.deal_cards(4);
   }
 }

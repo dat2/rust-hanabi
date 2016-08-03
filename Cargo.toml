@@ -11,3 +11,4 @@ serde_json = "*"
 dotenv = "*"
 dotenv_macros = "*"
 rand = "*"
+chrono = { version = "*", features = ["serde"] }

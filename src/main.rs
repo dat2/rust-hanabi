@@ -8,6 +8,7 @@ extern crate serde_json;
 extern crate ws;
 extern crate dotenv;
 extern crate rand;
+extern crate chrono;
 
 use dotenv::dotenv;
 use std::rc::Rc;
@@ -18,16 +19,22 @@ use ws::{listen,Message,Sender};
 // import local
 mod messages;
 mod game;
-use game::{GameState};
+use game::{GameState, Channel};
 use messages::{JsonMessage,Event};
 
-type ChannelName = String;
 type Registry = Rc<RefCell<HashMap<u64, Rc<Sender>>>>;
 
 // https://github.com/housleyjk/ws-rs/issues/56#issuecomment-231497839
 fn main()
 {
   dotenv().ok();
+
+  let mut c = Channel::new();
+  c.add_player(String::from("Nick"));
+  c.add_player(String::from("Pirave"));
+  c.start_game();
+  c.add_message(String::from("Hello World"));
+  println!("{:?}", c.has_player_with_name(String::from("Bob")));
 
   let registry: Registry = Rc::new(RefCell::new(HashMap::new()));
   let mut id_counter = 0;
@@ -67,7 +74,7 @@ fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
 // return a string to send back to the client
 fn handle_init(out: Rc<Sender>) -> Result<(), ws::Error>
 {
-  let response = JsonMessage { data: Event::GetState(GameState::new(5, 3)) };
+  let response = JsonMessage { data: Event::GetState(GameState::new(5)) };
   serialize_response(response, out)
 }
 
