@@ -3,24 +3,26 @@
 #![plugin(dotenv_macros)]
 
 // import external
-extern crate rand;
 extern crate serde;
 extern crate serde_json;
 extern crate ws;
 extern crate dotenv;
+extern crate rand;
+
+use dotenv::dotenv;
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use ws::{listen,Message,Sender};
 
 // import local
 mod messages;
 mod game;
-
 use game::{GameState};
-use dotenv::dotenv;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::collections::{HashMap,BTreeMap};
-use ws::{listen,Message,Sender};
-use serde_json::{Value, to_value};
 use messages::{JsonMessage,Event};
+
+type ChannelName = String;
+type Registry = Rc<RefCell<HashMap<u64, Rc<Sender>>>>;
 
 // https://github.com/housleyjk/ws-rs/issues/56#issuecomment-231497839
 fn main()
@@ -51,7 +53,10 @@ fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
   where T: serde::Serialize
 {
   match serde_json::to_string(&response) {
-    Ok(response) => out.send(response),
+    Ok(response) => {
+      println!("Sending {:?}", response);
+      out.send(response)
+    },
     Err(e) => {
       println!("Error while serializing response, {:?}", e);
       Ok(())
@@ -60,17 +65,11 @@ fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
 }
 
 // return a string to send back to the client
-fn handle_init(_: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
+fn handle_init(out: Rc<Sender>) -> Result<(), ws::Error>
 {
-  let game = GameState::new(5, 3);
-  let response = JsonMessage { event: Event::Init, data: to_value(&game) };
-
-  // return the string to send
+  let response = JsonMessage { data: Event::GetState(GameState::new(5, 3)) };
   serialize_response(response, out)
 }
-
-type ChannelName = String;
-type Registry = Rc<RefCell<HashMap<u64, Rc<Sender>>>>;
 
 struct Handler
 {
@@ -92,14 +91,8 @@ impl ws::Handler for Handler {
     let json_string = msg.as_text().unwrap();
 
     // try unwrapping if possible, else print an error
-    match serde_json::from_str(&json_string) {
-      Ok(m) => {
-        println!("Message received {:?}", m);
-        // match m.event {
-        //   Event::Init => handle_init(&m.data, self.out.clone())
-        // }
-        return Ok(());
-      },
+    let message: JsonMessage = match serde_json::from_str(&json_string) {
+      Ok(m) => m,
 
       // print an error
       Err(e) => {
@@ -107,6 +100,13 @@ impl ws::Handler for Handler {
         return Ok(());
       }
     };
+
+    println!("Message received {:?}", message);
+
+    match message.data {
+      Event::Init => handle_init(self.out.clone()),
+      _ => Ok(())
+    }
   }
 
   fn on_close(&mut self, _: ws::CloseCode, _: &str)

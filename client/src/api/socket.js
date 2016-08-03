@@ -18,13 +18,22 @@ class Socket {
     };
 
     this.connection.onmessage = function(message) {
-      const { event, data } = JSON.parse(message.data);
-      emitter.emit(event, data);
+      const { data } = JSON.parse(message.data);
+      if(typeof data === 'string') {
+        emitter.emit(data);
+      } else {
+        let [event] = Object.keys(data);
+        emitter.emit(event, data[event]);
+      }
     };
   }
 
-  emit(event, data) {
-    this.connection.send(JSON.stringify({ event, data }));
+  emit(event, messageData = undefined) {
+    let data = event;
+    if(messageData !== undefined) {
+      data = { [event]: messageData };
+    }
+    this.connection.send(JSON.stringify({ data }));
   }
 
   on(event, listener) {
