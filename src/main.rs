@@ -3,77 +3,24 @@
 #![plugin(dotenv_macros)]
 
 // import external
+extern crate rand;
 extern crate serde;
 extern crate serde_json;
 extern crate ws;
 extern crate dotenv;
-extern crate rand;
 
 // import local
 mod messages;
+mod game;
 
+use game::{GameState};
 use dotenv::dotenv;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap,BTreeMap};
 use ws::{listen,Message,Sender};
-use serde_json::{Value, Map, to_value};
+use serde_json::{Value, to_value};
 use messages::{JsonMessage,Event};
-use rand::{thread_rng, Rng};
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-enum Colour
-{
-  White,
-  Yellow,
-  Green,
-  Red,
-  Blue
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Card
-{
-  colour: Colour,
-  number: u64
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct GameState
-{
-  deck: Vec<Card>
-}
-
-impl GameState
-{
-  fn new(max_num: u64) -> GameState
-  {
-    let mut g = GameState { deck: Vec::new() };
-    g.gen_deck(max_num);
-    g.shuffle_deck();
-    g
-  }
-
-  fn gen_deck(&mut self, max_num: u64)
-  {
-    for x in 1..max_num+1 {
-      self.deck.push(Card { colour: Colour::White, number: x });
-      self.deck.push(Card { colour: Colour::Yellow, number: x });
-      self.deck.push(Card { colour: Colour::Green, number: x });
-      self.deck.push(Card { colour: Colour::Red, number: x });
-      self.deck.push(Card { colour: Colour::Blue, number: x });
-    }
-  }
-
-  // knuth shuffle
-  fn shuffle_deck(&mut self)
-  {
-    let mut rng = thread_rng();
-    rng.shuffle(&mut self.deck);
-  }
-}
-
-type PlayerId = u64;
 
 // https://github.com/housleyjk/ws-rs/issues/56#issuecomment-231497839
 fn main()
@@ -100,15 +47,26 @@ fn main()
 // cases we need to handle
 // intermittent client connections
 
+fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
+  where T: serde::Serialize
+{
+  match serde_json::to_string(&response) {
+    Ok(response) => out.send(response),
+    Err(e) => {
+      println!("Error while serializing response, {:?}", e);
+      Ok(())
+    }
+  }
+}
+
 // return a string to send back to the client
 fn handle_init(_: &Value, out: Rc<Sender>) -> Result<(), ws::Error>
 {
-  let game = GameState::new(5);
+  let game = GameState::new(5, 3);
   let response = JsonMessage { event: Event::Init, data: to_value(&game) };
 
   // return the string to send
-  let response = serde_json::to_string(&response).unwrap();
-  out.send(response)
+  serialize_response(response, out)
 }
 
 type ChannelName = String;
@@ -134,8 +92,14 @@ impl ws::Handler for Handler {
     let json_string = msg.as_text().unwrap();
 
     // try unwrapping if possible, else print an error
-    let message: JsonMessage = match serde_json::from_str(&json_string) {
-      Ok(m) => m,
+    match serde_json::from_str(&json_string) {
+      Ok(m) => {
+        println!("Message received {:?}", m);
+        // match m.event {
+        //   Event::Init => handle_init(&m.data, self.out.clone())
+        // }
+        return Ok(());
+      },
 
       // print an error
       Err(e) => {
@@ -143,12 +107,6 @@ impl ws::Handler for Handler {
         return Ok(());
       }
     };
-
-    println!("Message received {:?}", message);
-
-    match message.event {
-      Event::Init => handle_init(&message.data, self.out.clone())
-    }
   }
 
   fn on_close(&mut self, _: ws::CloseCode, _: &str)

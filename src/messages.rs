@@ -1,6 +1,4 @@
-extern crate serde;
-extern crate serde_json;
-
+use serde;
 use serde_json::{Value};
 
 // event string names
@@ -51,8 +49,8 @@ impl serde::Deserialize for Event
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct JsonMessage
+pub struct JsonMessage<T: serde::Serialize>
 {
   pub event: Event,
-  pub data: Value
+  pub data: T
 }
