@@ -1,6 +1,7 @@
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
 #![plugin(dotenv_macros)]
+#![plugin(phf_macros)]
 
 // import external
 extern crate serde;
@@ -9,6 +10,8 @@ extern crate ws;
 extern crate dotenv;
 extern crate rand;
 extern crate chrono;
+#[macro_use]
+extern crate phf;
 
 use dotenv::dotenv;
 use std::rc::Rc;
@@ -28,13 +31,6 @@ type Registry = Rc<RefCell<HashMap<u64, Rc<Sender>>>>;
 fn main()
 {
   dotenv().ok();
-
-  let mut c = Channel::new();
-  c.add_player(String::from("Nick"));
-  c.add_player(String::from("Pirave"));
-  c.start_game();
-  c.add_message(String::from("Hello World"));
-  println!("{:?}", c.has_player_with_name(String::from("Bob")));
 
   let registry: Registry = Rc::new(RefCell::new(HashMap::new()));
   let mut id_counter = 0;
@@ -74,7 +70,7 @@ fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
 // return a string to send back to the client
 fn handle_init(out: Rc<Sender>) -> Result<(), ws::Error>
 {
-  let response = JsonMessage { data: Event::GetState(GameState::new(5)) };
+  let response = JsonMessage { data: Event::GetState(GameState::new()) };
   serialize_response(response, out)
 }
 

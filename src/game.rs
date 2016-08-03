@@ -1,3 +1,4 @@
+use phf;
 use std::cell::Cell;
 use chrono::*;
 use rand::{thread_rng, Rng};
@@ -17,7 +18,7 @@ pub enum Colour
 pub struct Card
 {
   colour: Colour,
-  number: usize
+  number: u64
 }
 
 pub type PlayerId = u64;
@@ -30,24 +31,34 @@ pub struct GameState
   pub current_turn: PlayerId
 }
 
+static CARD_DISTRIBUTION: phf::Map<u64, u64> = phf_map! {
+  1u64 => 3,
+  2u64 => 2,
+  3u64 => 2,
+  4u64 => 2,
+  5u64 => 1,
+};
+
 impl GameState
 {
-  pub fn new(max_card_num: usize) -> GameState
+  pub fn new() -> GameState
   {
     let mut g = GameState { deck: Vec::new(), hands: BTreeMap::new(), current_turn: 0 };
-    g.gen_deck(max_card_num);
+    g.gen_deck();
     g.shuffle_deck();
     g
   }
 
-  fn gen_deck(&mut self, max_card_num: usize)
+  fn gen_deck(&mut self)
   {
-    for x in 1..max_card_num+1 {
-      self.deck.push(Card { colour: Colour::White, number: x });
-      self.deck.push(Card { colour: Colour::Yellow, number: x });
-      self.deck.push(Card { colour: Colour::Green, number: x });
-      self.deck.push(Card { colour: Colour::Red, number: x });
-      self.deck.push(Card { colour: Colour::Blue, number: x });
+    for x in 1..5+1 {
+      for _ in 1..CARD_DISTRIBUTION.get(&x).unwrap()+1 {
+        self.deck.push(Card { colour: Colour::White, number: x });
+        self.deck.push(Card { colour: Colour::Yellow, number: x });
+        self.deck.push(Card { colour: Colour::Green, number: x });
+        self.deck.push(Card { colour: Colour::Red, number: x });
+        self.deck.push(Card { colour: Colour::Blue, number: x });
+      }
     }
   }
 
@@ -108,7 +119,7 @@ impl Channel
       next_player_id: Cell::new(0),
       players: HashMap::new(),
       chat: Vec::new(),
-      game_state: GameState::new(5)
+      game_state: GameState::new()
     }
   }
 

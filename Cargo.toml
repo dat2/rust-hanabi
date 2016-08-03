@@ -12,3 +12,5 @@ dotenv = "*"
 dotenv_macros = "*"
 rand = "*"
 chrono = { version = "*", features = ["serde"] }
+phf = "*"
+phf_macros = "*"
