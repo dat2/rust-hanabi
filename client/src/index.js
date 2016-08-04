@@ -7,10 +7,16 @@ import './base.scss';
 import Socket from './api/socket';
 const listener = new Socket(`ws://${process.env.BIND}`);
 listener.on('connect', () => {
-  listener.on('GetState', (data) => {
+  listener.on('Error', (data) => {
+    console.error(data);
+  });
+
+  listener.emit('CreateChannel', 'nick');
+
+  listener.on('SendChannels', (data) => {
     console.log(data);
   });
-  listener.emit('Init');
+  listener.emit('GetChannels');
 });
 
 ReactDOM.render(
