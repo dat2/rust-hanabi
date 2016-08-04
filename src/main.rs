@@ -77,16 +77,16 @@ fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
 fn handle_get_channels(channels: ChannelRegistry, out: Rc<Sender>) -> Result<(), ws::Error>
 {
   let keys = Vec::from_iter(channels.borrow().keys().map(|s| s.to_owned()));
-  let response = JsonMessage { data: Event::SendChannels(keys) };
+  let response = JsonMessage { payload: Event::SendChannels(keys) };
   serialize_response(response, out)
 }
 
-fn handel_create_channel(channels: ChannelRegistry, name: String, out: Rc<Sender>) -> Result<(), ws::Error>
+fn handle_create_channel(channels: ChannelRegistry, name: String, out: Rc<Sender>) -> Result<(), ws::Error>
 {
   let mut borrowed = channels.borrow_mut();
   if borrowed.contains_key(&name)
   {
-    let response = JsonMessage { data: Event::Error(format!("The channel {} already exists!", name)) };
+    let response = JsonMessage { payload: Event::Error(format!("The channel {} already exists!", name)) };
     serialize_response(response, out)
   }
   else
@@ -131,10 +131,10 @@ impl ws::Handler for Handler {
 
     println!("Message received {:?}", message);
 
-    match message.data
+    match message.payload
     {
       Event::GetChannels => handle_get_channels(self.channels.clone(), self.out.clone()),
-      Event::CreateChannel(name) => handel_create_channel(self.channels.clone(), name, self.out.clone()),
+      Event::CreateChannel(name) => handle_create_channel(self.channels.clone(), name, self.out.clone()),
       _ => Ok(())
     }
   }

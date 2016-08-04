@@ -11,7 +11,7 @@ listener.on('connect', () => {
     console.error(data);
   });
 
-  listener.emit('CreateChannel', 'nick');
+  // listener.emit('CreateChannel', 'nick2');
 
   listener.on('SendChannels', (data) => {
     console.log(data);

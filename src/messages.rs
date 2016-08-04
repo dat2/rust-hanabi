@@ -18,5 +18,5 @@ pub enum Event
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct JsonMessage
 {
-  pub data: Event
+  pub payload: Event
 }
