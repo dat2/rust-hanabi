@@ -4,8 +4,14 @@ use game::{GameState};
 pub enum Event
 {
   Init,
+  GetChannels,
+  CreateChannel(String),
+  JoinChannel(String),
+  LeaveChannel,
+  StartGame,
   // The rest here is for us sending to the client, and we will never receive it
-  GetState(GameState)
+  SendChannels(Vec<String>),
+  SendState(GameState)
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

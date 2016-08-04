@@ -26,6 +26,7 @@ use game::{GameState, Channel};
 use messages::{JsonMessage,Event};
 
 type Registry = Rc<RefCell<HashMap<u64, Rc<Sender>>>>;
+type ChannelRegistry = Rc<RefCell<HashMap<String,Channel>>>;
 
 // https://github.com/housleyjk/ws-rs/issues/56#issuecomment-231497839
 fn main()
@@ -33,18 +34,20 @@ fn main()
   dotenv().ok();
 
   let registry: Registry = Rc::new(RefCell::new(HashMap::new()));
+  let channels: ChannelRegistry = Rc::new(RefCell::new(HashMap::new()));
   let mut id_counter = 0;
 
   // the main server handler
   listen(dotenv!("BIND"), |out|
   {
-    id_counter = id_counter + 1;
+    id_counter += 1;
 
     Handler
     {
       id: id_counter,
       out: Rc::new(out),
       registry: registry.clone(),
+      channels: channels.clone(),
     }
   }).unwrap()
 }
@@ -70,7 +73,14 @@ fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
 // return a string to send back to the client
 fn handle_init(out: Rc<Sender>) -> Result<(), ws::Error>
 {
-  let response = JsonMessage { data: Event::GetState(GameState::new()) };
+  let response = JsonMessage { data: Event::SendState(GameState::new()) };
+  serialize_response(response, out)
+}
+
+fn handle_get_channels(channels: ChannelRegistry, out: Rc<Sender>) -> Result<(), ws::Error>
+{
+  let keys = channels.borrow().keys().collect::<Vec<_>>();
+  let response = JsonMessage { data: Event::SendChannels(keys) };
   serialize_response(response, out)
 }
 
@@ -78,7 +88,8 @@ struct Handler
 {
   id: u64,
   out: Rc<Sender>,
-  registry: Registry
+  registry: Registry,
+  channels: ChannelRegistry
 }
 
 impl ws::Handler for Handler {
@@ -108,6 +119,7 @@ impl ws::Handler for Handler {
 
     match message.data {
       Event::Init => handle_init(self.out.clone()),
+      Event::GetChannels => handle_get_channels(self.channels.clone(), self.out.clone()),
       _ => Ok(())
     }
   }

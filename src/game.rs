@@ -51,8 +51,10 @@ impl GameState
 
   fn gen_deck(&mut self)
   {
-    for x in 1..5+1 {
-      for _ in 1..CARD_DISTRIBUTION.get(&x).unwrap()+1 {
+    for x in 1..5+1
+    {
+      for _ in 1..CARD_DISTRIBUTION.get(&x).unwrap()+1
+      {
         self.deck.push(Card { colour: Colour::White, number: x });
         self.deck.push(Card { colour: Colour::Yellow, number: x });
         self.deck.push(Card { colour: Colour::Green, number: x });
@@ -71,7 +73,8 @@ impl GameState
 
   fn init_players(&mut self, players: Vec<&PlayerId>)
   {
-    for id in players {
+    for id in players
+    {
       self.hands.insert(id.to_string(), Vec::new());
     }
   }
@@ -80,7 +83,8 @@ impl GameState
   {
     let keys = self.hands.keys().cloned().collect::<Vec<_>>();
 
-    for key in keys.iter().cycle().take(keys.len() * n_cards) {
+    for key in keys.iter().cycle().take(keys.len() * n_cards)
+    {
       self.hands.get_mut(key).unwrap().push(self.deck.pop().unwrap());
     }
   }
