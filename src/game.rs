@@ -132,10 +132,11 @@ impl Channel
     self.players.values().fold(false, |found, player| found || player.name == name)
   }
 
-  pub fn add_player(&mut self, name: String)
+  pub fn add_player(&mut self, name: &String)
   {
     // TODO generate JSON web token?
-    self.players.insert(self.next_player_id.get(), Player { name: name });
+    // TODO don't call to_owned
+    self.players.insert(self.next_player_id.get(), Player { name: name.to_owned() });
     self.next_player_id.set(self.next_player_id.get() + 1);
   }
 

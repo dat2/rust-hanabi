@@ -46,6 +46,7 @@ fn main()
     Handler
     {
       id: id_counter,
+      name: String::new(),
       out: Rc::new(out),
       registry: registry.clone(),
       channels: channels.clone(),
@@ -96,9 +97,31 @@ fn handle_create_channel(channels: ChannelRegistry, name: String, out: Rc<Sender
   }
 }
 
+fn handle_set_name(handler_name: &mut String, new_name: String) -> Result<(), ws::Error>
+{
+  *handler_name = new_name;
+  Ok(())
+}
+
+fn handle_join_channel(channels: ChannelRegistry, player_name: &String, channel_name: String, out: Rc<Sender>) -> Result<(), ws::Error>
+{
+  let mut borrowed = channels.borrow_mut();
+  if let Some(chan) = borrowed.get_mut(&channel_name)
+  {
+    chan.add_player(player_name);
+    Ok(())
+  }
+  else
+  {
+    let response = JsonMessage { payload: Event::Error(format!("The channel {} doesn't exist", channel_name)) };
+    serialize_response(response, out)
+  }
+}
+
 struct Handler
 {
   id: u64,
+  name: String,
   out: Rc<Sender>,
   registry: Registry,
   channels: ChannelRegistry
@@ -129,12 +152,14 @@ impl ws::Handler for Handler {
       }
     };
 
-    println!("Message received {:?}", message);
+    println!("Received {:?}", message);
 
     match message.payload
     {
       Event::GetChannels => handle_get_channels(self.channels.clone(), self.out.clone()),
-      Event::CreateChannel(name) => handle_create_channel(self.channels.clone(), name, self.out.clone()),
+      Event::CreateChannel(channel_name) => handle_create_channel(self.channels.clone(), channel_name, self.out.clone()),
+      Event::SetName(new_name) => handle_set_name(&mut self.name, new_name),
+      Event::JoinChannel(channel_name) => handle_join_channel(self.channels.clone(), &self.name, channel_name, self.out.clone()),
       _ => Ok(())
     }
   }

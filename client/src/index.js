@@ -7,11 +7,14 @@ import './base.scss';
 import Socket from './api/socket';
 const listener = new Socket(`ws://${process.env.BIND}`);
 listener.on('connect', () => {
+
+  listener.emit('SetName', 'nick');
+  listener.emit('CreateChannel', 'Nicks Channel');
+  listener.emit('JoinChannel', 'Nicks Channel');
+
   listener.on('Error', (data) => {
     console.error(data);
   });
-
-  // listener.emit('CreateChannel', 'nick2');
 
   listener.on('SendChannels', (data) => {
     console.log(data);

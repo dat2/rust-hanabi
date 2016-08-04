@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "bluebird": "^3.4.1",
-    "event-emitter": "^0.3.4",
+    "eventemitter3": "^1.2.0",
     "node-sass": "^3.8.0",
     "react": "^15.2.1",
     "react-dom": "^15.2.1"

@@ -1,11 +1,11 @@
-import ee from 'event-emitter';
+import EventEmitter from 'eventemitter3';
 
 /**
  * Very similar api to socket.io, however no reliability :) and no errors lol
  */
 class Socket {
   constructor(url) {
-    this.emitter = ee({});
+    this.emitter = new EventEmitter();
     const emitter = this.emitter;
 
     this.connection = new WebSocket(url);

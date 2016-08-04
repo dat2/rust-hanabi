@@ -3,6 +3,7 @@ use game::{GameState};
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Event
 {
+  SetName(String),
   GetChannels,
   CreateChannel(String),
   JoinChannel(String),
