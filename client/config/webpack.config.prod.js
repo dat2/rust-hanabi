@@ -54,6 +54,11 @@ module.exports = {
         query: require('./babel.prod')
       },
       {
+        test: /\.css$/,
+        include: nodeModulesPath,
+        loader: ExtractTextPlugin.extract('style', 'css')
+      },
+      {
         test: /\.scss$/,
         include: srcPath,
         // Disable autoprefixer in css-loader itself:

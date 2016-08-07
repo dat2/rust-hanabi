@@ -1,21 +1,16 @@
-import React, { Component } from 'react';
-import logo from './logo.svg';
+import React from 'react';
 import styles from './App.scss';
 
-class App extends Component {
-  render() {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <img src={logo} className={styles.logo} alt="logo" />
-          <h2>Welcome to React</h2>
-        </div>
-        <p className={styles.intro}>
-          To get started, edit <code>src/App.js</code> and save to reload.
-        </p>
-      </div>
-    );
-  }
-}
+import Nav from './Nav';
+
+const App = ({ children, name, onNameChange }) => (
+  <div>
+    <Nav items={[{ to: 'game', desc: 'Game' }]} />
+
+    <div className={'container-fluid ' + styles.children}>
+      { children }
+    </div>
+  </div>
+);
 
 export default App;

@@ -17,5 +17,12 @@
       To begin the development, run `npm start` in this folder.
       To create a production bundle, use `npm run build`.
     -->
+    <script>
+      var debug = {};
+      debug.trace = function(value, label) {
+        console.log(label || '', value);
+        return value;
+      };
+    </script>
   </body>
 </html>

@@ -58,6 +58,11 @@ module.exports = {
         query: require('./babel.dev')
       },
       {
+        test: /\.css$/,
+        include: nodeModulesPath,
+        loader: 'style!css'
+      },
+      {
         test: /\.scss$/,
         include: srcPath,
         loader: 'style!css?modules&localIdentName=[path][name]__[local]__[hash:base64:5]!postcss!sass'

@@ -28,12 +28,24 @@ class Socket {
     };
   }
 
+  waitForConnection(cb, interval = 1000) {
+    if(this.connection.readyState === 1) {
+      cb();
+    } else {
+      setTimeout(() => {
+        this.waitForConnection(cb, interval);
+      }, interval);
+    }
+  }
+
   emit(event, messageData = undefined) {
     let payload = event;
     if(messageData !== undefined) {
       payload = { [event]: messageData };
     }
-    this.connection.send(JSON.stringify({ payload }));
+    this.waitForConnection(() => {
+      this.connection.send(JSON.stringify({ payload }));
+    });
   }
 
   on(event, listener) {
@@ -41,4 +53,6 @@ class Socket {
   }
 }
 
-export default Socket;
+export { Socket };
+
+export default new Socket(`ws://${process.env.BIND}`);
