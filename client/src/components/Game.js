@@ -16,6 +16,11 @@ const enhance = compose(
     componentDidMount() {
       const { params: { name } } = this.props;
       socket.emit('JoinChannel', name);
+
+      socket.emit('SendMessage', 'TEST TEST 123');
+      socket.on('SendMessage', (data) => {
+        console.log(data);
+      });
     },
 
     componentWillUnmount() {

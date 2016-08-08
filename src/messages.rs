@@ -1,4 +1,8 @@
 use game::{GameState};
+use serde;
+use serde_json;
+use std::rc::Rc;
+use ws;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Event
@@ -23,4 +27,22 @@ pub enum Event
 pub struct JsonMessage
 {
   pub payload: Event
+}
+
+pub fn serialize_response<T> (response: T, out: Rc<ws::Sender>) -> Result<(), ws::Error>
+  where T: serde::Serialize
+{
+  match serde_json::to_string(&response)
+  {
+    Ok(response) =>
+    {
+      println!("Sending {:?}", response);
+      out.send(response)
+    },
+    Err(e) =>
+    {
+      println!("Error while serializing response, {:?}", e);
+      Ok(())
+    }
+  }
 }

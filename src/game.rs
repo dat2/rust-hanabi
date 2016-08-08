@@ -2,7 +2,10 @@ use phf;
 use std::cell::Cell;
 use chrono::*;
 use rand::{thread_rng, Rng};
+use std::rc::Weak;
 use std::collections::{BTreeMap, HashMap};
+use ws;
+use messages::{JsonMessage,Event,serialize_response};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Colour
@@ -95,7 +98,8 @@ pub type ChannelName = String;
 #[derive(Debug)]
 pub struct Player
 {
-  name: String
+  name: String,
+  out: Weak<ws::Sender>
 }
 
 #[derive(Debug)]
@@ -111,7 +115,7 @@ pub struct Channel
   pub next_player_id: Cell<PlayerId>,
   pub players: HashMap<PlayerId, Player>,
   pub chat: Vec<Message>,
-  pub game_state: GameState
+  pub game_state: GameState,
 }
 
 impl Channel
@@ -132,19 +136,39 @@ impl Channel
     self.players.values().fold(false, |found, player| found || player.name == name)
   }
 
-  pub fn add_player(&mut self, name: &str)
+  pub fn add_player(&mut self, name: &str, out: Weak<ws::Sender>)
   {
     // TODO generate JSON web token?
     // TODO don't call to_owned
-    self.players.insert(self.next_player_id.get(), Player { name: name.to_owned() });
+    self.players.insert(self.next_player_id.get(), Player { name: name.to_owned(), out: out });
     self.next_player_id.set(self.next_player_id.get() + 1);
   }
 
   // TODO remove player?
 
-  pub fn add_message(&mut self, text: String)
+  pub fn add_message(&mut self, text: String) -> Result<(), ws::Error>
   {
-    self.chat.push(Message { text: text, timestamp: UTC::now() });
+    let m = Message { text: text.clone(), timestamp: UTC::now() };
+    self.chat.push(m);
+
+    // now send a message to all the players
+    let message = JsonMessage { payload: Event::SendMessage(text.clone()) };
+    for player in self.players.values()
+    {
+      match player.out.upgrade() {
+        Some(ref out) =>
+        {
+          serialize_response(&message, out.clone());
+        },
+        None =>
+        {
+          // TODO remove this from the list of players?
+          println!("Failed to upgrade a weak ref for player {:?}", player.name);
+        }
+      }
+    }
+
+    Ok(())
   }
 
   pub fn start_game(&mut self)

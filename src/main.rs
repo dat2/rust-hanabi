@@ -15,7 +15,7 @@ extern crate phf;
 
 use std::iter::FromIterator;
 use dotenv::dotenv;
-use std::rc::{Rc,Weak};
+use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use ws::{listen,Message,Sender};
@@ -24,7 +24,7 @@ use ws::{listen,Message,Sender};
 mod messages;
 mod game;
 use game::{Channel};
-use messages::{JsonMessage,Event};
+use messages::{JsonMessage,Event,serialize_response};
 
 type Registry = Rc<RefCell<HashMap<u64, Rc<Sender>>>>;
 type ChannelRegistry = Rc<RefCell<HashMap<String,Rc<RefCell<Channel>>>>>;
@@ -65,27 +65,6 @@ fn main()
   }).unwrap()
 }
 
-// cases we need to handle
-// intermittent client connections
-
-fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
-  where T: serde::Serialize
-{
-  match serde_json::to_string(&response)
-  {
-    Ok(response) =>
-    {
-      println!("Sending {:?}", response);
-      out.send(response)
-    },
-    Err(e) =>
-    {
-      println!("Error while serializing response, {:?}", e);
-      Ok(())
-    }
-  }
-}
-
 fn handle_get_channels(handler: &Handler) -> Result<(), ws::Error>
 {
   let keys = Vec::from_iter(handler.channels.borrow().keys().map(|s| s.to_owned()));
@@ -121,7 +100,7 @@ fn handle_join_channel(handler: &mut Handler, channel_name: String) -> Result<()
   {
     Some(chan) =>
     {
-      chan.borrow_mut().add_player(&handler.name);
+      chan.borrow_mut().add_player(&handler.name, Rc::downgrade(&handler.out));
       handler.current_channel = Some(chan.clone());
       Ok(())
     },
@@ -137,9 +116,9 @@ fn handle_send_message(handler: &mut Handler, message: String) -> Result<(), ws:
 {
   match handler.current_channel
   {
-    Some(chan) =>
+    Some(ref mut chan) =>
     {
-      Ok(())
+      chan.borrow_mut().add_message(message)
     },
     None =>
     {
