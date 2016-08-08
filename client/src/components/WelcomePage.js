@@ -31,11 +31,11 @@ const WelcomePage = enhance(({ name, onNameChange, onSubmit }) => (
   <div className='hero is-primary is-fullheight'>
     <div className='hero-body'>
       <div className='container'>
-        <h1 className='title'>Welcome</h1>
+        <h1 className='title'>Welcome To Hanabi!</h1>
 
         <form onSubmit={onSubmit}>
           <p className='control'>
-            <label className='label'>Type in your name</label>
+            <label className='label'>Please type in your name before you can play</label>
             <input className='input' type='text' value={name} onChange={onNameChange}/>
           </p>
           <p className='control'>

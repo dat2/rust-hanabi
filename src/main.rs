@@ -15,7 +15,7 @@ extern crate phf;
 
 use std::iter::FromIterator;
 use dotenv::dotenv;
-use std::rc::Rc;
+use std::rc::{Rc,Weak};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use ws::{listen,Message,Sender};
@@ -27,7 +27,17 @@ use game::{Channel};
 use messages::{JsonMessage,Event};
 
 type Registry = Rc<RefCell<HashMap<u64, Rc<Sender>>>>;
-type ChannelRegistry = Rc<RefCell<HashMap<String,Channel>>>;
+type ChannelRegistry = Rc<RefCell<HashMap<String,Rc<RefCell<Channel>>>>>;
+
+struct Handler
+{
+  id: u64,
+  name: String,
+  out: Rc<Sender>,
+  registry: Registry,
+  channels: ChannelRegistry,
+  current_channel: Option<Rc<RefCell<Channel>>>
+}
 
 // https://github.com/housleyjk/ws-rs/issues/56#issuecomment-231497839
 fn main()
@@ -50,6 +60,7 @@ fn main()
       out: Rc::new(out),
       registry: registry.clone(),
       channels: channels.clone(),
+      current_channel: None
     }
   }).unwrap()
 }
@@ -75,56 +86,67 @@ fn serialize_response<T> (response: T, out: Rc<Sender>) -> Result<(), ws::Error>
   }
 }
 
-fn handle_get_channels(channels: ChannelRegistry, out: Rc<Sender>) -> Result<(), ws::Error>
+fn handle_get_channels(handler: &Handler) -> Result<(), ws::Error>
 {
-  let keys = Vec::from_iter(channels.borrow().keys().map(|s| s.to_owned()));
+  let keys = Vec::from_iter(handler.channels.borrow().keys().map(|s| s.to_owned()));
   let response = JsonMessage { payload: Event::SendChannels(keys) };
-  serialize_response(response, out)
+  serialize_response(response, handler.out.clone())
 }
 
-fn handle_create_channel(channels: ChannelRegistry, name: String, out: Rc<Sender>) -> Result<(), ws::Error>
+fn handle_create_channel(handler: &Handler, name: String) -> Result<(), ws::Error>
 {
-  let mut borrowed = channels.borrow_mut();
+  let mut borrowed = handler.channels.borrow_mut();
   if borrowed.contains_key(&name)
   {
     let response = JsonMessage { payload: Event::Error(format!("The channel {} already exists!", name)) };
-    serialize_response(response, out)
+    serialize_response(response, handler.out.clone())
   }
   else
   {
-    borrowed.insert(name, Channel::new());
+    borrowed.insert(name, Rc::new(RefCell::new(Channel::new())));
     Ok(())
   }
 }
 
-fn handle_set_name(handler_name: &mut String, new_name: String) -> Result<(), ws::Error>
+fn handle_set_name(handler: &mut Handler, new_name: String) -> Result<(), ws::Error>
 {
-  *handler_name = new_name;
+  handler.name = new_name;
   Ok(())
 }
 
-fn handle_join_channel(channels: ChannelRegistry, player_name: &String, channel_name: String, out: Rc<Sender>) -> Result<(), ws::Error>
+fn handle_join_channel(handler: &mut Handler, channel_name: String) -> Result<(), ws::Error>
 {
-  let mut borrowed = channels.borrow_mut();
-  if let Some(chan) = borrowed.get_mut(&channel_name)
+  let mut borrowed = handler.channels.borrow_mut();
+  match borrowed.get_mut(&channel_name)
   {
-    chan.add_player(player_name);
-    Ok(())
-  }
-  else
-  {
-    let response = JsonMessage { payload: Event::Error(format!("The channel {} doesn't exist", channel_name)) };
-    serialize_response(response, out)
+    Some(chan) =>
+    {
+      chan.borrow_mut().add_player(&handler.name);
+      handler.current_channel = Some(chan.clone());
+      Ok(())
+    },
+    None =>
+    {
+      let response = JsonMessage { payload: Event::Error(format!("The channel {} doesn't exist", channel_name)) };
+      serialize_response(response, handler.out.clone())
+    }
   }
 }
 
-struct Handler
+fn handle_send_message(handler: &mut Handler, message: String) -> Result<(), ws::Error>
 {
-  id: u64,
-  name: String,
-  out: Rc<Sender>,
-  registry: Registry,
-  channels: ChannelRegistry
+  match handler.current_channel
+  {
+    Some(chan) =>
+    {
+      Ok(())
+    },
+    None =>
+    {
+      let response = JsonMessage { payload: Event::Error(String::from("You are not in a channel!")) };
+      serialize_response(response, handler.out.clone())
+    }
+  }
 }
 
 impl ws::Handler for Handler {
@@ -140,7 +162,7 @@ impl ws::Handler for Handler {
     let json_string = msg.as_text().unwrap();
 
     // try unwrapping if possible, else print an error
-    let message: JsonMessage = match serde_json::from_str(&json_string)
+    let message: JsonMessage = match serde_json::from_str(json_string)
     {
       Ok(m) => m,
 
@@ -156,10 +178,11 @@ impl ws::Handler for Handler {
 
     match message.payload
     {
-      Event::GetChannels => handle_get_channels(self.channels.clone(), self.out.clone()),
-      Event::CreateChannel(channel_name) => handle_create_channel(self.channels.clone(), channel_name, self.out.clone()),
-      Event::SetName(new_name) => handle_set_name(&mut self.name, new_name),
-      Event::JoinChannel(channel_name) => handle_join_channel(self.channels.clone(), &self.name, channel_name, self.out.clone()),
+      Event::GetChannels => handle_get_channels(self),
+      Event::CreateChannel(channel_name) => handle_create_channel(self, channel_name),
+      Event::SetName(new_name) => handle_set_name(self, new_name),
+      Event::JoinChannel(channel_name) => handle_join_channel(self, channel_name),
+      Event::SendMessage(message) => handle_send_message(self, message),
       _ => Ok(())
     }
   }

@@ -132,7 +132,7 @@ impl Channel
     self.players.values().fold(false, |found, player| found || player.name == name)
   }
 
-  pub fn add_player(&mut self, name: &String)
+  pub fn add_player(&mut self, name: &str)
   {
     // TODO generate JSON web token?
     // TODO don't call to_owned
