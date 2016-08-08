@@ -23,6 +23,10 @@ module.exports = {
     browser: true
   },
 
+  globals: {
+    process: true
+  },
+
   parserOptions: {
     ecmaVersion: 6,
     sourceType: 'module',

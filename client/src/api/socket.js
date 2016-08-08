@@ -6,9 +6,14 @@ import EventEmitter from 'eventemitter3';
 class Socket {
   constructor(url) {
     this.emitter = new EventEmitter();
-    const emitter = this.emitter;
 
     this.connection = new WebSocket(url);
+    this.attachEventHandlers();
+  }
+
+  attachEventHandlers() {
+    const emitter = this.emitter;
+
     this.connection.onopen = function() {
       emitter.emit('connect');
     };
@@ -52,7 +57,5 @@ class Socket {
     this.emitter.on(event, listener);
   }
 }
-
-export { Socket };
 
 export default new Socket(`ws://${process.env.BIND}`);
