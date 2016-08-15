@@ -1,0 +1,5 @@
+{
+  "execMap": {
+    "elm": "elm make --output=build/main.js "
+  }
+}

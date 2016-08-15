@@ -7,3 +7,10 @@ npm-debug.log
 
 # 12factor app files
 .env
+
+# elm stuff
+elm-client/build/main.js
+elm-client/elm-stuff
+
+# os stuff
+.DS_Store

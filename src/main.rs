@@ -44,6 +44,8 @@ fn main()
 {
   dotenv().ok();
 
+  println!("Listening on {:?}", dotenv!("BIND"));
+
   let registry: Registry = Rc::new(RefCell::new(HashMap::new()));
   let channels: ChannelRegistry = Rc::new(RefCell::new(HashMap::new()));
   let mut id_counter = 0;
