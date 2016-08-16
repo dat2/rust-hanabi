@@ -9,8 +9,11 @@ npm-debug.log
 .env
 
 # elm stuff
-elm-client/build/main.js
+elm-client/build/*
 elm-client/elm-stuff
+
+# haskell stuff
+dist
 
 # os stuff
 .DS_Store

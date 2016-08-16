@@ -23,13 +23,13 @@ encodeClientEvent msg =
     (event, data) =
       case msg of
         SetName name -> ("SetName", E.string name)
-        GetChannels -> ("GetChannels", E.null)
+        GetChannels -> ("GetChannels", E.list [])
         CreateChannel channel -> ("CreateChannel", E.string channel)
         JoinChannel channel -> ("JoinChannel", E.string channel)
-        LeaveChannel -> ("LeaveChannel", E.null)
+        LeaveChannel -> ("LeaveChannel", E.list [])
         SendMessage message -> ("SendMessage", E.string message)
   in
-    E.encode 0 (E.object [("payload", if data == E.null then E.string event else E.object [(event, data)] )])
+    E.encode 0 (E.object [("payload", E.object [(event, data)] )])
 
 type ServerEvent
   = SendChannels (List String)
