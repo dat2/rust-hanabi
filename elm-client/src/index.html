@@ -11,8 +11,8 @@
 
   <script src="main.js"></script>
   <script>
-    var options = { webSocketAddress: 'ws://127.0.0.1:3300' };
-    console.log('The server is bound on 127.0.0.1:3300');
+    var options = { webSocketAddress: 'ws://<%= BIND %>:<%= PORT %>' };
+    console.log('The server is bound on <%= BIND %>:<%= PORT %>');
 
     var node = document.getElementById('elm-root');
     var app = Elm.Main.embed(node, options);

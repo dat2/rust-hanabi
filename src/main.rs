@@ -13,8 +13,10 @@ extern crate chrono;
 #[macro_use]
 extern crate phf;
 
+use std::u16;
 use std::iter::FromIterator;
 use dotenv::dotenv;
+use std::env;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -44,14 +46,19 @@ fn main()
 {
   dotenv().ok();
 
-  println!("Listening on {:?}", dotenv!("BIND"));
+  // the dotenv! macro is at compile time!
+  let bind = dotenv!("BIND");
+  let port = u16::from_str_radix(dotenv!("PORT"), 10).unwrap();
+
+  println!("Listening on {}:{}", bind, port);
 
   let registry: Registry = Rc::new(RefCell::new(HashMap::new()));
   let channels: ChannelRegistry = Rc::new(RefCell::new(HashMap::new()));
   let mut id_counter = 0;
 
+
   // the main server handler
-  listen(dotenv!("BIND"), |out|
+  listen((bind, port), |out|
   {
     id_counter += 1;
 

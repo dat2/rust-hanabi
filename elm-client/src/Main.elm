@@ -1,3 +1,6 @@
+port module Main exposing (..)
+
+import Debug
 import Html exposing (..)
 import Html.App as Html
 import Html.Attributes exposing (type', placeholder, class)
@@ -6,16 +9,18 @@ import Html.Events exposing (onInput, onClick, onSubmit)
 import WebSocket
 import Task
 import Http
-import ServerApi exposing (..)
 
 import Navigation
 import Hop exposing (makeUrl, makeUrlFromLocation, matchUrl, setQuery)
 import Hop.Types exposing (Config, Query, Location, PathMatcher, Router)
 import Hop.Matchers exposing (..)
 
+import ServerApi exposing (..)
+
 -- model
 type alias Model =
-  { playername : String
+  { webSocketAddress : String
+  , playername : String
   , channels : List Channel
   , channelname : String
   , createIsOpen : Bool
@@ -56,8 +61,8 @@ urlUpdate (route, location) model =
 navigateTo : String -> Cmd Msg
 navigateTo path = makeUrl routerConfig path |> Navigation.newUrl
 
-sendEvent : ClientEvent -> Cmd Msg
-sendEvent event = WebSocket.send "ws://localhost:4500" (encodeClientEvent event)
+sendEvent : String -> ClientEvent -> Cmd Msg
+sendEvent webSocketAddress event = WebSocket.send webSocketAddress (encodeClientEvent event)
 
 -- update
 type Msg
@@ -91,16 +96,16 @@ update msg model =
   case msg of
     -- the base events (navigate, send, receive)
     NavigateTo path -> (model, navigateTo path)
-    Send event -> (model, sendEvent event)
+    Send event -> (model, sendEvent model.webSocketAddress event)
     Receive event -> (updateWithServerEvent event model, Cmd.none)
     -- the welcome page events
     ChangePlayerName new -> ({ model | playername = new }, Cmd.none)
-    SubmitName -> (model, Cmd.batch [  navigateTo "/lobby", sendEvent (SetName model.playername) ])
+    SubmitName -> (model, Cmd.batch [  navigateTo "/lobby", sendEvent model.webSocketAddress (SetName model.playername) ])
     -- the lobby page events
     SetModalOpen open -> ({ model | createIsOpen = open }, Cmd.none)
     ChangeChannelName new -> ({ model | channelname = new }, Cmd.none)
-    SubmitChannelName -> ({ model | createIsOpen = False, channelname = "" }, Cmd.batch [sendEvent GetChannels, sendEvent (CreateChannel model.channelname)])
-    JoinThisChannel channel -> (model, Cmd.batch [ sendEvent (JoinChannel channel) ])
+    SubmitChannelName -> ({ model | createIsOpen = False, channelname = "" }, Cmd.batch [sendEvent model.webSocketAddress GetChannels, sendEvent model.webSocketAddress (CreateChannel model.channelname)])
+    JoinThisChannel channel -> (model, Cmd.batch [ sendEvent model.webSocketAddress (JoinChannel channel) ])
 
 -- view
 makeIcon : String -> Html Msg
@@ -211,19 +216,25 @@ view model =
   div [] [ pageView model ]
 
 -- subscriptions
+port webSocketAddress : (String -> msg) -> Sub msg
+
 decodeResponseToMsg : String -> Msg
 decodeResponseToMsg s = Receive (decodeResponse s)
 
 subscriptions : Model -> Sub Msg
-subscriptions model = WebSocket.listen "ws://localhost:4500" decodeResponseToMsg
+subscriptions model = WebSocket.listen model.webSocketAddress decodeResponseToMsg
 
 -- init
-init : (Route, Hop.Types.Location) -> (Model, Cmd Msg)
-init (route, location) = (Model "" [] "" False "" location route, WebSocket.send "ws://localhost:4500" (encodeClientEvent GetChannels))
+type alias Flags =
+  { webSocketAddress : String
+  }
+
+init : Flags -> (Route, Hop.Types.Location) -> (Model, Cmd Msg)
+init flags (route, location) = (Model flags.webSocketAddress "" [] "" False "" location route, sendEvent flags.webSocketAddress GetChannels)
 
 -- finally wire it all together
 main =
-  Navigation.program urlParser
+  Navigation.programWithFlags urlParser
     { init = init
     , update = update
     , urlUpdate = urlUpdate
