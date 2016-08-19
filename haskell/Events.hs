@@ -4,23 +4,23 @@
 
 module Events where
 
-import GHC.Generics
 import Data.Aeson
 import Data.Aeson.TH
 import Data.Text (Text)
 import qualified Data.ByteString.Lazy as B
 
+import GameState
+
 data Event =
-    SetName String
+    SetName Text
   | GetChannels
-  | CreateChannel String
-  | JoinChannel String
+  | CreateChannel Text
+  | JoinChannel Text
   | LeaveChannel
+  | Message Text
   | StartGame
-  | SendMessage String
-  | SendChannels [String]
-  -- | SendState(GameState),
-  | EventError String
+  | SendChannels [Channel]
+  | ServerError Text
   deriving (Eq, Show)
 
 data WebSocketMessage =

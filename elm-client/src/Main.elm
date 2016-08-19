@@ -3,7 +3,7 @@ port module Main exposing (..)
 import Debug
 import Html exposing (..)
 import Html.App as Html
-import Html.Attributes exposing (type', placeholder, class)
+import Html.Attributes exposing (type', placeholder, class, value)
 import Html.Events exposing (onInput, onClick, onSubmit)
 
 import WebSocket
@@ -20,10 +20,11 @@ import ServerApi exposing (..)
 -- model
 type alias Model =
   { webSocketAddress : String
-  , playername : String
-  , channels : List Channel
-  , channelname : String
-  , createIsOpen : Bool
+  , welcomePagePlayerName : String
+  , lobbyPageChannels : List Channel
+  , lobbyPageChannelName : String
+  , lobbyPageCreateModalOpen : Bool
+  , channel : Channel
   , error : String
   , location : Location
   , route : Route
@@ -33,12 +34,14 @@ type alias Model =
 type Route
   = WelcomeRoute
   | LobbyRoute
+  | GameRoute
   | NotFoundRoute
 
 matchers : List (PathMatcher Route)
 matchers =
   [ match1 WelcomeRoute ""
   , match1 LobbyRoute "/lobby"
+  , match1 GameRoute "/game"
   ]
 
 routerConfig : Config Route
@@ -84,8 +87,8 @@ updateWithServerEvent event model =
   let
     updateModel ev =
       case ev of
-        SendChannels channels -> { model | channels = channels }
-        Error error -> { model | error = error }
+        SendChannels lobbyPageChannels -> { model | lobbyPageChannels = lobbyPageChannels }
+        ServerError error -> { model | error = error }
   in
     case event of
       Ok ev -> updateModel ev
@@ -99,13 +102,13 @@ update msg model =
     Send event -> (model, sendEvent model.webSocketAddress event)
     Receive event -> (updateWithServerEvent event model, Cmd.none)
     -- the welcome page events
-    ChangePlayerName new -> ({ model | playername = new }, Cmd.none)
-    SubmitName -> (model, Cmd.batch [  navigateTo "/lobby", sendEvent model.webSocketAddress (SetName model.playername) ])
+    ChangePlayerName new -> ({ model | welcomePagePlayerName = new }, Cmd.none)
+    SubmitName -> (model, Cmd.batch [  navigateTo "/lobby", sendEvent model.webSocketAddress (SetName model.welcomePagePlayerName) ])
     -- the lobby page events
-    SetModalOpen open -> ({ model | createIsOpen = open }, Cmd.none)
-    ChangeChannelName new -> ({ model | channelname = new }, Cmd.none)
-    SubmitChannelName -> ({ model | createIsOpen = False, channelname = "" }, Cmd.batch [sendEvent model.webSocketAddress GetChannels, sendEvent model.webSocketAddress (CreateChannel model.channelname)])
-    JoinThisChannel channel -> (model, Cmd.batch [ sendEvent model.webSocketAddress (JoinChannel channel) ])
+    SetModalOpen open -> ({ model | lobbyPageCreateModalOpen = open, lobbyPageChannelName = if open then model.lobbyPageChannelName else "" }, Cmd.none)
+    ChangeChannelName new -> ({ model | lobbyPageChannelName = new }, Cmd.none)
+    SubmitChannelName -> ({ model | lobbyPageCreateModalOpen = False, lobbyPageChannelName = "" }, Cmd.batch [sendEvent model.webSocketAddress GetChannels, sendEvent model.webSocketAddress (CreateChannel model.lobbyPageChannelName)])
+    JoinThisChannel channel -> (model, Cmd.batch [ sendEvent model.webSocketAddress (JoinChannel channel), navigateTo "/game" ])
 
 -- view
 makeIcon : String -> Html Msg
@@ -142,7 +145,7 @@ welcomePage model =
 
 createChannelModal : Model -> Html Msg
 createChannelModal model =
-  div [class ("modal" ++ (if model.createIsOpen then " is-active" else "") )]
+  div [class ("modal" ++ (if model.lobbyPageCreateModalOpen then " is-active" else "") )]
     [ div [class "modal-background", onClick (SetModalOpen False)] []
     , div [class "modal-card"]
         [ header [class "modal-card-head"]
@@ -153,7 +156,7 @@ createChannelModal model =
             [ form [ onSubmit SubmitChannelName ]
                 [ p [class "control"]
                     [ label [class "control"] [text "Channel Name"]
-                    , input [class "input", type' "text", onInput ChangeChannelName] []
+                    , input [class "input", type' "text", onInput ChangeChannelName, value model.lobbyPageChannelName] []
                     ]
                 ]
             ]
@@ -183,12 +186,12 @@ channelCard channel =
       ]
     ]
 
-channelsList : Model -> Html Msg
-channelsList model =
+lobbyPageChannelsList : Model -> Html Msg
+lobbyPageChannelsList model =
   div [class "columns is-multiline"]
-    (List.map channelCard model.channels)
+    (List.map channelCard model.lobbyPageChannels)
 
--- the lobby page is where you can create a channel, and join channels
+-- the lobby page is where you can create a channel, and join lobbyPageChannels
 lobbyPage : Model -> Html Msg
 lobbyPage model =
   div []
@@ -200,15 +203,20 @@ lobbyPage model =
       ]
     , div [class "section"]
       [ createChannelModal model
-      , channelsList model
+      , lobbyPageChannelsList model
       ]
     ]
+
+gamePage : Model -> Html Msg
+gamePage model =
+  div [] [ text "You are in the game :)" ]
 
 pageView : Model -> Html Msg
 pageView model =
   case model.route of
     WelcomeRoute -> welcomePage model
     LobbyRoute -> lobbyPage model
+    GameRoute -> gamePage model
     NotFoundRoute -> div [] [ h2 [class "title"] [text "How did you get here??"] ]
 
 view : Model -> Html Msg
@@ -230,7 +238,19 @@ type alias Flags =
   }
 
 init : Flags -> (Route, Hop.Types.Location) -> (Model, Cmd Msg)
-init flags (route, location) = (Model flags.webSocketAddress "" [] "" False "" location route, sendEvent flags.webSocketAddress GetChannels)
+init flags (route, location) =
+  ({ webSocketAddress = flags.webSocketAddress
+    , welcomePagePlayerName = ""
+    , lobbyPageChannels = []
+    , lobbyPageChannelName = ""
+    , lobbyPageCreateModalOpen = False
+    , channel = nullChannel
+    , error = ""
+    , location = location
+    , route = route
+  }
+  , sendEvent flags.webSocketAddress GetChannels
+  )
 
 -- finally wire it all together
 main =

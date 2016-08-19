@@ -65,7 +65,11 @@ executable hanabi
                        random-shuffle,
                        containers,
                        dotenv,
-                       bytestring
+                       bytestring,
+                       mtl,
+                       transformers,
+                       lens,
+                       datetime
 
   -- Directories containing source files.
   hs-source-dirs:      haskell

@@ -1,14 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module GameState where
 
-import GHC.Generics
 import System.Random
 import System.Random.Shuffle
+import Control.Lens
 import Data.Aeson
+import Data.Aeson.TH
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
+import Data.DateTime
 
 data Colour =
     Yellow
@@ -16,21 +17,33 @@ data Colour =
   | Blue
   | Green
   | White
-  deriving (Show, Generic)
-
-instance ToJSON Colour where
-  toEncoding = genericToEncoding defaultOptions
-instance FromJSON Colour
+  deriving (Show,Eq)
 
 data Card =
   Card {
     number :: Int,
     colour :: Colour
-  } deriving (Show, Generic)
+  } deriving (Show,Eq)
 
-instance ToJSON Card where
-  toEncoding = genericToEncoding defaultOptions
-instance FromJSON Card
+type PlayerId = Int
+data Player =
+  Player {
+    _name :: Text,
+    _uid :: PlayerId,
+    _channel :: Text
+  } deriving (Show, Eq)
+
+data Channel =
+  Channel {
+    _playerIds :: [Int],
+    _messages :: [(Text,DateTime)]
+  } deriving (Eq, Show)
+
+makeLenses ''Player
+makeLenses ''Channel
+
+deriveJSON defaultOptions ''Colour
+deriveJSON defaultOptions{ sumEncoding = ObjectWithSingleField } ''Card
 
 -- generate a list of cards
 generateDeck :: [Card]

@@ -1,4 +1,4 @@
-module ServerApi exposing (ClientEvent(..), encodeClientEvent, ServerEvent(..), serverEventToString, decodeResponse, Channel)
+module ServerApi exposing (ClientEvent(..), encodeClientEvent, ServerEvent(..), serverEventToString, decodeResponse, Channel, nullChannel)
 
 import Json.Decode exposing (..)
 import Json.Encode as E
@@ -33,20 +33,23 @@ encodeClientEvent msg =
 
 type ServerEvent
   = SendChannels (List String)
-  | Error String
+  | ServerError String
 
 serverEventToString : ServerEvent -> String
 serverEventToString response =
   case response of
     SendChannels l -> "SendChannels(" ++ (String.join "," l) ++ ")"
-    Error s -> "Error(" ++ s ++ ")"
+    ServerError s -> "Error(" ++ s ++ ")"
 
 serverEvent : Decoder ServerEvent
 serverEvent =
   "payload" := oneOf
     [ "SendChannels" := object1 SendChannels (list string)
-    , "Error" := object1 Error string
+    , "Error" := object1 ServerError string
     ]
 
 decodeResponse : String -> Result String ServerEvent
 decodeResponse = decodeString serverEvent
+
+nullChannel : Channel
+nullChannel = ""
