@@ -13,6 +13,7 @@ import ServerState
 
 main :: IO ()
 main = do
+
   -- load dotenv file
   Dotenv.loadFile False ".env"
   bind <- getEnv "BIND"

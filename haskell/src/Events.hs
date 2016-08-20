@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Events where
@@ -17,7 +15,8 @@ data Event =
   | CreateChannel Text
   | JoinChannel Text
   | LeaveChannel
-  | Message Text
+  | PlayerLeftChannel Text
+  | SendMessage Text
   | StartGame
   | SendChannels [Channel]
   | ServerError Text

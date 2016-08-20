@@ -16,6 +16,7 @@ import Hop.Types exposing (Config, Query, Location, PathMatcher, Router)
 import Hop.Matchers exposing (..)
 
 import ServerApi exposing (..)
+import GameState exposing (..)
 
 -- model
 type alias Model =
@@ -24,6 +25,7 @@ type alias Model =
   , lobbyPageChannels : List Channel
   , lobbyPageChannelName : String
   , lobbyPageCreateModalOpen : Bool
+  , gamePageMessage : String
   , channel : Channel
   , error : String
   , location : Location
@@ -81,6 +83,8 @@ type Msg
   | ChangeChannelName String
   | SubmitChannelName
   | JoinThisChannel String
+  -- the game page messages
+  | ChangeMessageText String
 
 updateWithServerEvent : Result String ServerEvent -> Model -> Model
 updateWithServerEvent event model =
@@ -109,6 +113,8 @@ update msg model =
     ChangeChannelName new -> ({ model | lobbyPageChannelName = new }, Cmd.none)
     SubmitChannelName -> ({ model | lobbyPageCreateModalOpen = False, lobbyPageChannelName = "" }, Cmd.batch [sendEvent model.webSocketAddress GetChannels, sendEvent model.webSocketAddress (CreateChannel model.lobbyPageChannelName)])
     JoinThisChannel channel -> (model, Cmd.batch [ sendEvent model.webSocketAddress (JoinChannel channel), navigateTo "/game" ])
+    -- the game page messages
+    ChangeMessageText text -> ({ model | gamePageMessage = text }, Cmd.none)
 
 -- view
 makeIcon : String -> Html Msg
@@ -172,13 +178,13 @@ channelCard channel =
   div [class "column is-one-quarter"]
     [ div [class "card is-fullwidth"]
       [ div [class "card-header"]
-          [ p [class "card-header-title"] [text channel]
-          , a [class "card-header-icon"] [ i [class "fa fa-sign-in", onClick (JoinThisChannel channel)] [] ]
+          [ p [class "card-header-title"] [text channel.cname]
+          , a [class "card-header-icon"] [ i [class "fa fa-sign-in", onClick (JoinThisChannel channel.cname)] [] ]
           ]
       , div [class "card-content"]
           []
       , div [class "card-footer"]
-          [ a [class "card-footer-item",onClick (JoinThisChannel channel)]
+          [ a [class "card-footer-item",onClick (JoinThisChannel channel.cname)]
             [ makeIcon "sign-in"
             , span [] [text "Join"]
             ]
@@ -209,7 +215,8 @@ lobbyPage model =
 
 gamePage : Model -> Html Msg
 gamePage model =
-  div [] [ text "You are in the game :)" ]
+  div []
+    [ text "You are in the game :)" ]
 
 pageView : Model -> Html Msg
 pageView model =
@@ -244,7 +251,8 @@ init flags (route, location) =
     , lobbyPageChannels = []
     , lobbyPageChannelName = ""
     , lobbyPageCreateModalOpen = False
-    , channel = nullChannel
+    , gamePageMessage = ""
+    , channel = newChannel ""
     , error = ""
     , location = location
     , route = route
