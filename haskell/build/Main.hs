@@ -14,7 +14,7 @@ prepare :: String -> String
 prepare m =
   let
     replaceWhere = replace "module GameState where" "module GameState exposing (..)\n\nimport Date exposing (Date,Day)\nimport DecodeDate exposing (jsonDecDate,jsonEncDate)"
-    replaceDateTime = replace "DateTime" "Date"
+    replaceDateTime = replace "DotNetTime" "Date"
   in
     (replaceWhere . replaceDateTime) m
 

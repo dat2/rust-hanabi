@@ -1,274 +1,208 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NamedFieldPuns #-}
 
 module ServerState where
 
-import Prelude hiding (catch)
-import Control.Exception
-import Data.List
-import Data.Maybe
-import Data.Text (Text)
+import Control.Lens
+import Control.Monad.State
+import Control.Concurrent (MVar, readMVar, modifyMVar_)
 import Data.Aeson
 import Data.DateTime
-import Control.Exception (finally)
-import Control.Monad (forM_, forever)
-import Control.Monad.Trans.Class
-import Control.Monad.State
-import Control.Concurrent (MVar, newMVar, modifyMVar_, modifyMVar, readMVar)
+import Data.List
+import Data.Text (Text)
 
 import qualified Data.Map as Map
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
+import qualified Data.IntMap as IntMap
 import qualified Network.WebSockets as WS
 
+import MonadSupply
 import GameState
 import Events
-import MonadSupply
+import Helpers (finallyStateT)
 
--- https://www.schoolofhaskell.com/user/snoyberg/general-haskell/exceptions/exceptions-and-monad-transformers
--- show
-catchStateT :: Exception e => StateT s IO a -> (e -> StateT s IO a) -> StateT s IO a
-catchStateT a onE = do
-    s1 <- get
-    (result, s2) <- liftIO $ runStateT a s1 `catch` \e ->
-        runStateT (onE e) s1
-    put s2
-    return result
+-- these types are all for the server to manage
+type UID = Int
+data SPlayer = SPlayer { _sname :: Text, _schannel :: Text } deriving Show
+data SChannel = SChannel { _suids :: [UID], _smessages :: [(UID, Text, DateTime)] } deriving Show
 
-finallyStateT :: StateT s IO a -> StateT s IO b -> StateT s IO a
-finallyStateT a sequel = do
-    result <- a `catchStateT` \e -> do
-        _ignored <- sequel
-        liftIO $ throwIO (e :: SomeException)
-    _ignored <- sequel
-    return result
--- /show
-
--- https://github.com/jaspervdj/websockets/blob/master/example/server.lhs
-
-type Client = WS.Connection
 instance Show WS.Connection where
   show _ = "Connection"
 
--- the player id is just for server state purposes
-type PlayerId = Int
--- the server channel is just to link ids with the channel
-type ServerChannel = ([PlayerId], Channel)
-
-data ServerState =
-  ServerState {
-    clients :: Map.Map PlayerId Client,
-    playerMap :: Map.Map PlayerId Player,
-    channels :: Map.Map Text ServerChannel,
-    uidSupply :: [PlayerId]
+-- this state is to keep things normalized, no duplications anywhere
+data SharedState =
+  SharedState {
+    _sconnections :: IntMap.IntMap WS.Connection,
+    _splayers :: IntMap.IntMap SPlayer,
+    _schannels :: Map.Map Text SChannel,
+    _suidSupply :: [UID]
   } deriving Show
 
--- create a new server state object
-newServerState :: ServerState
-newServerState = ServerState Map.empty Map.empty Map.empty [1..]
-
+-- each thread has a pointer to the shared state
 data ThreadState =
   ThreadState {
-    sharedState :: MVar ServerState,
-    uid :: PlayerId,
-    connection :: WS.Connection
+    _tsharedState :: MVar SharedState,
+    _tconnection :: WS.Connection,
+    _tuid :: UID
   }
+
+makeLenses ''SPlayer
+makeLenses ''SChannel
+makeLenses ''SharedState
+makeLenses ''ThreadState
 
 type ThreadStateMonad a = StateT ThreadState IO a
 
--- make it easier to write modifying functions
-updateServerState :: (ServerState -> ServerState) -> ThreadStateMonad ()
-updateServerState fn = do
-  state <- gets sharedState
+-- print something to the console
+printMessage :: Show a => String -> a -> ThreadStateMonad ()
+printMessage label msg = liftIO $ do
+  putStrLn "=========================="
+  putStrLn $ "[" ++ label ++ "]: " ++ show msg
+  putStrLn "=========================="
 
-  liftIO $ modifyMVar_ state $ \s -> do
-    let result = fn s
-    putStrLn $ "Players: " ++ (show $ playerMap result)
-    putStrLn $ "Channels: " ++ (show $ channels result)
-    return result
+-- create a new server state object
+newSharedState :: SharedState
+newSharedState = SharedState IntMap.empty IntMap.empty Map.empty [1..]
 
--- update a client
-updatePlayer :: Int -> (Player -> Player) -> ServerState -> ServerState
-updatePlayer pid fn state@ServerState { playerMap } = state { playerMap = Map.update (Just . fn) pid playerMap }
+-- create a new server managed player
+newSPlayer :: SPlayer
+newSPlayer = SPlayer { _sname = "", _schannel = "" }
 
--- add a client to the list
-addClient :: Client -> (PlayerId, Player) -> ServerState -> ServerState
-addClient client (uid,player) state@ServerState{ playerMap, clients }=
-  let
-    updateClients = Map.insert uid client
-    updatePlayers = Map.insert uid player
-  in
-    state { clients = updateClients clients, playerMap = updatePlayers playerMap }
+-- create a new server managed channel
+newSChannel :: SChannel
+newSChannel = SChannel { _suids = [], _smessages = [] }
 
--- remove a client from the list
-removeClient :: Client -> PlayerId -> ServerState -> ServerState
-removeClient client uid state@ServerState { clients, playerMap } =
-  state { clients = Map.delete uid clients, playerMap = Map.delete uid playerMap }
+-- get the shared state stored in the MVar
+readSharedState :: ThreadStateMonad (SharedState)
+readSharedState = do
+  mvar <- gets _tsharedState
+  state <- liftIO $ readMVar mvar
+  return state
 
--- handle the create channel function
-createChannel :: Text -> ServerState -> ServerState
-createChannel t state@ServerState{ channels } = state { channels = Map.insert t ([], newChannel t) channels }
+-- update the shared state stored in the MVar
+updateSharedState :: (SharedState -> SharedState) -> ThreadStateMonad ()
+updateSharedState fn = do
+  state <- gets _tsharedState
+  liftIO $ modifyMVar_ state $ \s -> return $ fn s
 
--- handle the join channel
-joinChannel :: PlayerId -> Text -> ServerState -> ServerState
-joinChannel pid ch state@ServerState{ playerMap, channels } =
-  let
-    maybePlayer = Map.lookup pid playerMap
-    updatePlayer (player@Player { channel }) = player { channel = ch }
-    addPlayerToChannel player (ids, chan@Channel { players }) = (pid:ids, chan { players = player:players })
-  in
-    case maybePlayer of
-      Just player -> state { channels = Map.update (Just . addPlayerToChannel player) ch channels, playerMap = Map.update (Just . updatePlayer) pid playerMap }
-      Nothing -> state
+  -- print it after (for debug purposes)
+  shared <- readSharedState
+  printMessage "UPDATING SHARED STATE" (_splayers shared, _schannels shared)
 
-getChannels :: ThreadStateMonad [Channel]
-getChannels = do
-  st <- gets sharedState
-  state <- liftIO $ readMVar st
+-- update the thread state
+updateThreadState :: (ThreadState -> ThreadState) -> ThreadStateMonad ()
+updateThreadState = modify
 
-  return . map snd . Map.elems . channels $ state
+-- broadcast a message to all players in the channel
+broadcastToChannel :: Event -> ThreadStateMonad ()
+broadcastToChannel event = do
+  uid <- gets _tuid
+  let message = encode (WebSocketMessage event)
+  printMessage "SENDING" message
 
-getPlayerChannel :: PlayerId -> ServerState -> Maybe Text
-getPlayerChannel pid = fmap channel . Map.lookup pid . playerMap
+  state <- readSharedState
+  channel <- getCurrentChannel
+  let playersInChannel = state ^.schannels.at channel._Just.suids
 
-getPlayerName :: PlayerId -> ServerState -> Maybe Text
-getPlayerName pid = fmap name . Map.lookup pid . playerMap
+  let connections = map snd . filter (\(u, _) -> elem u playersInChannel) . IntMap.toList . _sconnections $ state
+  liftIO $ forM_ connections (flip WS.sendTextData message)
 
-leaveChannel :: PlayerId -> ServerState -> ServerState
-leaveChannel pid state@ServerState{ playerMap, channels } =
-  let
-    maybePlayer = Map.lookup pid playerMap
-    updatePlayer (player@Player { channel }) = player { channel = "" }
-    removePlayerFromChannel player (ids, chan@Channel { players }) = (delete pid ids, chan { players = delete player players })
-  in
-    case maybePlayer of
-      Just player -> state { channels = Map.update (Just . removePlayerFromChannel player) (channel player) channels, playerMap = Map.update (Just . updatePlayer) pid playerMap }
-      Nothing -> state
+-- send a WebSocketMessage to this client
+sendEvent :: Event -> ThreadStateMonad ()
+sendEvent event = do
+  let message = (WebSocketMessage event)
+  conn <- gets _tconnection
+  printMessage "SENDING" message
+  liftIO $ WS.sendTextData conn (encode message)
 
-sendMessage :: PlayerId -> (Text, DateTime) -> ServerState -> ServerState
-sendMessage pid msg state@ServerState { playerMap, channels } =
-  let
-    maybePlayer = Map.lookup pid playerMap
-    updateChannel (pids,chan@Channel { messages }) = (pids, chan { messages = msg:messages })
-  in
-    case maybePlayer of
-      Just player -> state { channels = Map.update (Just . updateChannel) (channel player) channels }
-      Nothing -> state
+getChannelsForClient :: ThreadStateMonad [Channel]
+getChannelsForClient = do
+  state <- readSharedState
 
--- Broadcast sends a message to all clients
-broadcastToChannel :: Text -> Event -> ThreadStateMonad ()
-broadcastToChannel channel event = do
-  st <- gets sharedState
-  state <- liftIO $ readMVar st
+  let getPlayersForChannel chan = map (\n -> Player n []) $ state ^.. splayers.each.filtered (\p -> _schannel p == chan).sname
 
-  let ch = Map.lookup channel . channels $ state
-  liftIO $ print ch
-  -- mapMOf_ (clients.to Map.elems) (\conn -> WS.sendTextData conn message) state
+  let getMessagesForChannel chan = map (\(uid,text,dt) -> (state ^.splayers.at uid._Just.sname,text,DotNetTime dt)) $ chan ^.smessages
 
--- the send function will send a WebSocketMessage
-getClient :: PlayerId -> ServerState -> ThreadStateMonad Client
-getClient pid s@ServerState { clients } = do
-  return $ fromJust $ Map.lookup pid clients
+  let channels = map (\(n,chan) -> Channel n (getPlayersForChannel n) (getMessagesForChannel chan)) . Map.toList . _schannels $ state
 
-send :: Event -> ThreadStateMonad ()
-send response = do
-  conn <- gets connection
-  let message = (encode $ WebSocketMessage response)
-  liftIO $ print message
-  liftIO $ WS.sendTextData conn message
+  return $ channels
 
-sendPlayerLeft :: ThreadStateMonad ()
-sendPlayerLeft = do
-  pid <- gets uid
-  state <- gets sharedState
-  st <- liftIO $ readMVar state
-  let channel = fromJust $ getPlayerChannel pid st
-  let name = fromJust $ getPlayerName pid st
-  broadcastToChannel channel (PlayerLeftChannel name)
+-- get the current channel that the player is in
+getCurrentChannel :: ThreadStateMonad Text
+getCurrentChannel = do
+  uid <- gets _tuid
+  state <- readSharedState
+  return $ state ^.splayers.at uid._Just.schannel
 
--- the respond function will respond to the decoded message
+-- respond to a client request
 respond :: Event -> ThreadStateMonad ()
-respond (SetName n) = do
-  pid <- gets uid
-  updateServerState $ updatePlayer pid (setName n)
-respond (GetChannels) = do
-  pid <- gets uid
-  channels <- getChannels
-  send $ (SendChannels channels)
-respond (CreateChannel channel) = updateServerState $ createChannel channel
+respond (SetName new) = do
+  uid <- gets _tuid
+  updateSharedState (set (splayers.at uid._Just.sname) new)
 
--- TODO send this channels information back to the client
-respond (JoinChannel channel) = do
-  pid <- gets uid
-  updateServerState $ joinChannel pid channel
+respond (CreateChannel name) = do
+  updateSharedState (over schannels (Map.insert name newSChannel))
+
+respond (GetChannels) = do
+  channels <- getChannelsForClient
+  sendEvent $ SendChannels channels
+
+respond (JoinChannel name) = do
+  uid <- gets _tuid
+  updateSharedState (set (splayers.at uid._Just.schannel) name . over (schannels.at name._Just.suids) (cons uid))
+
+respond (SendMessage m) = do
+  uid <- gets _tuid
+  channel <- getCurrentChannel
+  time <- liftIO $ getCurrentTime
+  updateSharedState (over (schannels.at channel._Just.smessages) (cons (uid, m, time)))
+
+  -- send the message to everybody
+  state <- readSharedState
+  broadcastToChannel (ServerSendMessage (state ^.splayers.at uid._Just.sname, m, DotNetTime time))
 
 respond (LeaveChannel) = do
-  pid <- gets uid
-  updateServerState $ leaveChannel pid
-  sendPlayerLeft
+  uid <- gets _tuid
+  channel <- getCurrentChannel
+  updateSharedState (set (splayers.at uid._Just.schannel) "" . over (schannels.at channel._Just.suids) (delete uid))
 
-respond (SendMessage text) = do
-  pid <- gets uid
-  state <- gets sharedState
-  st <- liftIO $ readMVar state
-  let channel = fromJust $ getPlayerChannel pid st
+respond _ = sendEvent $ ServerError "Not Implemented"
 
-  time <- liftIO $ getCurrentTime
-  updateServerState $ sendMessage pid (text,time)
-  broadcastToChannel channels (SendMessage text)
+-- remove this client from the shared state
+onDisconnect :: ThreadStateMonad ()
+onDisconnect = do
+  uid <- gets _tuid
+  channel <- getCurrentChannel
+  updateSharedState (over (schannels.at channel._Just.suids) (delete uid) . over sconnections (IntMap.delete uid) . over splayers (IntMap.delete uid))
 
-respond _ = do
-  send $ ServerError "Not implemented"
+createThread :: ThreadStateMonad ()
+createThread = do
+  -- first generate a uid for this player
+  state <- readSharedState
+  (uid, rest) <- runSupplyT supply $ _suidSupply state
+  conn <- gets _tconnection
 
-disconnect :: ThreadStateMonad ()
-disconnect = do
-  pid <- gets uid
-  conn <- gets connection
+  -- update the supply
+  -- add the thread connection to the shared state
+  -- add a new player to the shared state
+  updateSharedState (set suidSupply rest . over sconnections (IntMap.insert uid conn) . over splayers (IntMap.insert uid newSPlayer))
 
-  sendPlayerLeft
-  updateServerState $ leaveChannel pid . removeClient conn pid
+  -- once we've generated the id, update the thread state
+  updateThreadState (set tuid uid)
 
-
-clientApplication :: ThreadStateMonad ()
-clientApplication = do
-  -- get a new unique id for each player
-  state <- gets sharedState
-  conn <- gets connection
-
-  -- get a new uid
-  s <- liftIO $ readMVar state
-  (uid, rest) <- runSupplyT supply (uidSupply s)
-  updateServerState $ \(s@ServerState { uidSupply }) -> s { uidSupply = rest }
-
-  let player = (uid, newPlayer)
-
-  -- put the uid into the thread state
-  modify (\s@ThreadState { uid } -> s { uid = uid })
-
-  flip finallyStateT disconnect $ do
-
-    -- first, add the client to the list
-    updateServerState $ addClient conn player
-
-    -- then listen for all messages and do something
+  flip finallyStateT onDisconnect $ do
     forever $ do
-      -- read the message, decode, and send a response
       msg <- liftIO $ WS.receiveData conn
+      printMessage "RECEIVED" msg
 
-      -- if the event is valid, respond to it
       let maybeEvent = (decode msg :: Maybe WebSocketMessage)
       case maybeEvent of
         Just (WebSocketMessage event) -> respond event
-        Nothing -> send $ ServerError "Invalid message type"
+        Nothing -> sendEvent $ ServerError "Invalid message received."
 
--- main Websocket application
--- Note that `WS.ServerApp` is nothing but a type synonym for
--- `WS.PendingConnection -> IO ()`.
-application :: MVar ServerState -> WS.ServerApp
+
+application :: MVar SharedState -> WS.ServerApp
 application state pending = do
   conn <- WS.acceptRequest pending
   WS.forkPingThread conn 30
 
-  -- stateT monad
-  evalStateT clientApplication (ThreadState state 0 conn)
-
+  evalStateT createThread (ThreadState state conn 0)

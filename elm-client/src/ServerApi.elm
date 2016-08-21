@@ -1,10 +1,12 @@
-module ServerApi exposing (ClientEvent(..), encodeClientEvent, ServerEvent(..), serverEventToString, decodeResponse, newChannel)
+module ServerApi exposing (ClientEvent(..), encodeClientEvent, ServerEvent(..), decodeResponse)
 
 import Json.Decode exposing (..)
 import Json.Encode as E
 import String
+import Date exposing (Date)
 
 import GameState exposing (..)
+import DecodeDate exposing (jsonDecDate)
 
 type ClientEvent
   = SetName String
@@ -33,23 +35,16 @@ encodeClientEvent msg =
 
 type ServerEvent
   = SendChannels (List Channel)
+  | ServerSendMessage (String, String, Date)
   | ServerError String
-
-serverEventToString : ServerEvent -> String
-serverEventToString response =
-  case response of
-    SendChannels l -> "SendChannels(" ++ "" ++ ")"
-    ServerError s -> "Error(" ++ s ++ ")"
 
 serverEvent : Decoder ServerEvent
 serverEvent =
   "payload" := oneOf
     [ "SendChannels" := object1 SendChannels (list jsonDecChannel)
+    , "ServerSendMessage" := tuple3 (\player -> \message -> \d -> ServerSendMessage (player, message, d)) string string jsonDecDate
     , "Error" := object1 ServerError string
     ]
 
 decodeResponse : String -> Result String ServerEvent
 decodeResponse = decodeString serverEvent
-
-newChannel : String -> Channel
-newChannel name = { players = [], messages = [], cname = name }

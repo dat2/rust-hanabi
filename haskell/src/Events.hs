@@ -15,10 +15,12 @@ data Event =
   | CreateChannel Text
   | JoinChannel Text
   | LeaveChannel
-  | PlayerLeftChannel Text
   | SendMessage Text
+  | PlayerLeftChannel Text
   | StartGame
+  -- send back to client
   | SendChannels [Channel]
+  | ServerSendMessage (Text,Text,DotNetTime)
   | ServerError Text
   deriving (Eq, Show)
 

@@ -21,5 +21,5 @@ main = do
 
   putStrLn $ "Listening on " ++ bind  ++ ":" ++ port
 
-  state <- newMVar newServerState
+  state <- newMVar newSharedState
   WS.runServer bind (read port :: Int) $ application state

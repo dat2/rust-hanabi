@@ -1,6 +1,6 @@
 port module Main exposing (..)
 
-import Debug
+import Date exposing (Date)
 import Html exposing (..)
 import Html.App as Html
 import Html.Attributes exposing (type', placeholder, class, value)
@@ -9,6 +9,10 @@ import Html.Events exposing (onInput, onClick, onSubmit)
 import WebSocket
 import Task
 import Http
+import List
+import Maybe
+import Debug
+import String
 
 import Navigation
 import Hop exposing (makeUrl, makeUrlFromLocation, matchUrl, setQuery)
@@ -85,18 +89,22 @@ type Msg
   | JoinThisChannel String
   -- the game page messages
   | ChangeMessageText String
+  | LeaveThisChannel
+  | SubmitMessage
 
 updateWithServerEvent : Result String ServerEvent -> Model -> Model
 updateWithServerEvent event model =
   let
+    channel = model.channel
     updateModel ev =
       case ev of
         SendChannels lobbyPageChannels -> { model | lobbyPageChannels = lobbyPageChannels }
+        ServerSendMessage msg -> { model | channel = { channel | messages = msg :: model.channel.messages } }
         ServerError error -> { model | error = error }
   in
     case event of
       Ok ev -> updateModel ev
-      Err error -> { model | error = error }
+      Err error -> Debug.log "ServerEvent error" { model | error = error }
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -112,9 +120,11 @@ update msg model =
     SetModalOpen open -> ({ model | lobbyPageCreateModalOpen = open, lobbyPageChannelName = if open then model.lobbyPageChannelName else "" }, Cmd.none)
     ChangeChannelName new -> ({ model | lobbyPageChannelName = new }, Cmd.none)
     SubmitChannelName -> ({ model | lobbyPageCreateModalOpen = False, lobbyPageChannelName = "" }, Cmd.batch [sendEvent model.webSocketAddress GetChannels, sendEvent model.webSocketAddress (CreateChannel model.lobbyPageChannelName)])
-    JoinThisChannel channel -> (model, Cmd.batch [ sendEvent model.webSocketAddress (JoinChannel channel), navigateTo "/game" ])
+    JoinThisChannel channel -> ({ model | channel = Maybe.withDefault (model.channel) (List.head (List.filter (\c -> c.cname == channel) model.lobbyPageChannels)) }, Cmd.batch [ sendEvent model.webSocketAddress (JoinChannel channel), navigateTo "/game" ])
     -- the game page messages
     ChangeMessageText text -> ({ model | gamePageMessage = text }, Cmd.none)
+    SubmitMessage -> ({ model | gamePageMessage = "" },sendEvent model.webSocketAddress (SendMessage model.gamePageMessage))
+    LeaveThisChannel -> (model, Cmd.batch [ sendEvent model.webSocketAddress LeaveChannel, navigateTo "/lobby" ])
 
 -- view
 makeIcon : String -> Html Msg
@@ -182,7 +192,12 @@ channelCard channel =
           , a [class "card-header-icon"] [ i [class "fa fa-sign-in", onClick (JoinThisChannel channel.cname)] [] ]
           ]
       , div [class "card-content"]
-          []
+          [ div [class "content"]
+              [ text "Players in the channel ("
+              , text (toString (List.length channel.players))
+              , text ")"
+              ]
+          ]
       , div [class "card-footer"]
           [ a [class "card-footer-item",onClick (JoinThisChannel channel.cname)]
             [ makeIcon "sign-in"
@@ -213,10 +228,44 @@ lobbyPage model =
       ]
     ]
 
+
+formatDate : Date -> String
+formatDate d = (String.padLeft 2 '0' (toString (Date.hour d))) ++ ":" ++ (String.padLeft 2 '0' (toString (Date.minute d))) ++ ":" ++ (String.padLeft 2 '0' (toString (Date.second d)))
+
+gamePageMessageBox : (String, String, Date) -> Html Msg
+gamePageMessageBox (player, message, date) =
+  div [class "box"]
+    [ article [class "media"]
+        [ div [class "media-content"]
+            [ p []
+              [ strong [] [text player]
+              , text " "
+              , small [] [text (formatDate date)]
+              , br [] []
+              , text message
+              ]
+            ]
+        ]
+    ]
+
 gamePage : Model -> Html Msg
 gamePage model =
   div []
-    [ text "You are in the game :)" ]
+    [ nav [class "nav has-shadow"]
+      [ div [class "nav-left"]
+        [ div [class "nav-item"] [ makeIconButton [ onClick LeaveThisChannel ] "backward" "" "Go Back" ] ] ]
+    , div [class "columns"]
+      [ div [class "column is-three-quarters"] []
+      , div [class "column"]
+          [ text "chat messages"
+          , section [class "section"]
+              [ form [onSubmit SubmitMessage]
+                [ input [class "input", type' "text", onInput ChangeMessageText, value model.gamePageMessage] [] ]
+              ]
+          , div [class "content"] (List.map gamePageMessageBox model.channel.messages)
+          ]
+      ]
+    ]
 
 pageView : Model -> Html Msg
 pageView model =
@@ -238,6 +287,9 @@ decodeResponseToMsg s = Receive (decodeResponse s)
 
 subscriptions : Model -> Sub Msg
 subscriptions model = WebSocket.listen model.webSocketAddress decodeResponseToMsg
+
+newChannel : String -> Channel
+newChannel name = { players = [], messages = [], cname = name }
 
 -- init
 type alias Flags =

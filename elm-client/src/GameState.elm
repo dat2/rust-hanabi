@@ -57,22 +57,19 @@ jsonEncCard  val =
 type alias Player  =
    { name: String
    , cards: (List Card)
-   , channel: String
    }
 
 jsonDecPlayer : Json.Decode.Decoder ( Player )
 jsonDecPlayer =
    ("name" := Json.Decode.string) `Json.Decode.andThen` \pname ->
    ("cards" := Json.Decode.list (jsonDecCard)) `Json.Decode.andThen` \pcards ->
-   ("channel" := Json.Decode.string) `Json.Decode.andThen` \pchannel ->
-   Json.Decode.succeed {name = pname, cards = pcards, channel = pchannel}
+   Json.Decode.succeed {name = pname, cards = pcards}
 
 jsonEncPlayer : Player -> Value
 jsonEncPlayer  val =
    Json.Encode.object
    [ ("name", Json.Encode.string val.name)
    , ("cards", (Json.Encode.list << List.map jsonEncCard) val.cards)
-   , ("channel", Json.Encode.string val.channel)
    ]
 
 
@@ -80,14 +77,14 @@ jsonEncPlayer  val =
 type alias Channel  =
    { cname: String
    , players: (List Player)
-   , messages: (List (String, Date))
+   , messages: (List (String, String, Date))
    }
 
 jsonDecChannel : Json.Decode.Decoder ( Channel )
 jsonDecChannel =
    ("cname" := Json.Decode.string) `Json.Decode.andThen` \pcname ->
    ("players" := Json.Decode.list (jsonDecPlayer)) `Json.Decode.andThen` \pplayers ->
-   ("messages" := Json.Decode.list (Json.Decode.tuple2 (,) (Json.Decode.string) (jsonDecDate))) `Json.Decode.andThen` \pmessages ->
+   ("messages" := Json.Decode.list (Json.Decode.tuple3 (,,) (Json.Decode.string) (Json.Decode.string) (jsonDecDate))) `Json.Decode.andThen` \pmessages ->
    Json.Decode.succeed {cname = pcname, players = pplayers, messages = pmessages}
 
 jsonEncChannel : Channel -> Value
@@ -95,6 +92,6 @@ jsonEncChannel  val =
    Json.Encode.object
    [ ("cname", Json.Encode.string val.cname)
    , ("players", (Json.Encode.list << List.map jsonEncPlayer) val.players)
-   , ("messages", (Json.Encode.list << List.map (\(v1,v2) -> Json.Encode.list [(Json.Encode.string) v1,(jsonEncDate) v2])) val.messages)
+   , ("messages", (Json.Encode.list << List.map (\(v1,v2,v3) -> Json.Encode.list [(Json.Encode.string) v1,(Json.Encode.string) v2,(jsonEncDate) v3])) val.messages)
    ]
 

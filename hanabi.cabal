@@ -69,7 +69,9 @@ executable hanabi
                        mtl,
                        transformers,
                        datetime,
-                       elm-bridge
+                       elm-bridge,
+                       lens,
+                       old-time
 
   -- Directories containing source files.
   hs-source-dirs:      haskell/src, haskell/shared
@@ -103,7 +105,8 @@ executable generate-elm
                        elm-bridge,
                        directory,
                        filepath,
-                       MissingH
+                       MissingH,
+                       old-time
 
   -- Directories containing source files.
   hs-source-dirs:      haskell/build, haskell/shared

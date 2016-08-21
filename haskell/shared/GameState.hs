@@ -8,10 +8,13 @@ import Elm.Derive
 
 import System.Random
 import System.Random.Shuffle
--- import Data.Aeson
--- import Data.Aeson.TH
-import Data.Text (Text)
+import System.Time
+import Control.Applicative
+import Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, Value(Number),DotNetTime)
 import Data.DateTime
+import Data.Maybe
+import Data.Ratio
+import Data.Text (Text)
 
 data Colour =
     Yellow
@@ -30,29 +33,18 @@ data Card =
 data Player =
   Player {
     name :: Text,
-    cards :: [Card],
-    channel :: Text
+    cards :: [Card]
   } deriving (Show,Eq)
-
-newPlayer :: Player
-newPlayer = Player { name = "", cards = [], channel = "" }
-
-setName :: Text -> Player -> Player
-setName n player = player { name = n }
 
 data Channel =
   Channel {
     cname :: Text,
     players :: [Player],
-    messages :: [(Text, DateTime)]
+    messages :: [(Text, Text, DotNetTime)]
   } deriving (Show,Eq)
-
-newChannel :: Text -> Channel
-newChannel name = Channel { players = [], messages = [], cname = name }
 
 deriveBoth defaultOptions ''Colour
 deriveBoth defaultOptions{ sumEncoding = ObjectWithSingleField } ''Card
--- remove the underscore
 deriveBoth defaultOptions{ sumEncoding = ObjectWithSingleField } ''Player
 deriveBoth defaultOptions{ sumEncoding = ObjectWithSingleField } ''Channel
 
