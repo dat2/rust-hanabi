@@ -8,6 +8,7 @@ import qualified Configuration.Dotenv as Dotenv
 import qualified Network.WebSockets as WS
 
 import ServerState
+import WebSocketServer
 
 main :: IO ()
 main = do

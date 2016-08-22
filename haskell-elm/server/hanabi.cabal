@@ -15,22 +15,32 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     GameState
-                     , GameTypes
+  exposed-modules:     GameTypes
+                     , ServerTypes
                      , WebSocketTypes
+                     , GameState
+                     , ServerState
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , bytestring
+                     , containers
+                     , datetime
                      , elm-bridge
                      , old-time
+                     , lens
+                     , mtl
                      , random
                      , random-shuffle
                      , text
+                     , websockets
   default-language:    Haskell2010
 
 executable hanabi-exe
   hs-source-dirs:      app
   main-is:             Main.hs
+  other-modules:       WebSocketServer
+                     , Helpers
+                     , MonadSupply
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , hanabi
@@ -64,6 +74,8 @@ test-suite hanabi-test
   main-is:             Spec.hs
   build-depends:       base
                      , hanabi
+                     , hspec
+                     , QuickCheck
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
