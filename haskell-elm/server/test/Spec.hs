@@ -14,6 +14,7 @@ main = hspec $ do
       let state = newSharedState
       let afterState = addPlayer 1 state
       getPlayer 1 afterState `shouldBe` Just newSPlayer
+
     it "setName should update the name correctly" $ do
       let state = newSharedState
       let afterState = setName 1 "Nick" . addPlayer 1 $ state

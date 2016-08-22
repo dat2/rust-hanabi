@@ -4,7 +4,9 @@ module WebSocketServer where
 
 import Control.Concurrent (MVar, readMVar, modifyMVar_)
 import Control.Lens
+import Control.Monad.Exception (finallyStateT)
 import Control.Monad.State
+import Control.Monad.Supply
 import Data.Aeson
 import Data.DateTime
 import Data.List
@@ -21,8 +23,6 @@ import ServerTypes
 import GameState
 import ServerState
 
-import MonadSupply
-import Helpers (finallyStateT)
 
 -- print something to the console
 printMessage :: Show a => String -> a -> ThreadStateMonad ()

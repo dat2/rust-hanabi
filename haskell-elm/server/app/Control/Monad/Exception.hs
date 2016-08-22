@@ -1,4 +1,4 @@
-module Helpers (finallyStateT) where
+module Control.Monad.Exception (finallyStateT) where
 
 import Prelude hiding (catch)
 import Control.Exception

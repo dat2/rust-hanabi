@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module MonadSupply where
+module Control.Monad.Supply where
 
 import Control.Monad
 import Control.Monad.Identity
