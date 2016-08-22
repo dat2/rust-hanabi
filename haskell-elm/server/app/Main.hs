@@ -7,15 +7,13 @@ import Configuration.Dotenv
 import qualified Configuration.Dotenv as Dotenv
 import qualified Network.WebSockets as WS
 
-import Events
-import GameState
 import ServerState
 
 main :: IO ()
 main = do
 
   -- load dotenv file
-  Dotenv.loadFile False ".env"
+  Dotenv.loadFile False "../.env"
   bind <- getEnv "BIND"
   port <- getEnv "PORT"
 

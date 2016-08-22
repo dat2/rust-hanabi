@@ -1,4 +1,4 @@
-module GameState exposing (..)
+module GameTypes exposing (..)
 
 import Date exposing (Date,Day)
 import DecodeDate exposing (jsonDecDate,jsonEncDate)

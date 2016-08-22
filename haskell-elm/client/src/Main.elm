@@ -20,7 +20,7 @@ import Hop.Types exposing (Config, Query, Location, PathMatcher, Router)
 import Hop.Matchers exposing (..)
 
 import ServerApi exposing (..)
-import GameState exposing (..)
+import GameTypes exposing (..)
 
 -- model
 type alias Model =

@@ -15,9 +15,10 @@ import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Network.WebSockets as WS
 
+import GameTypes
+import WebSocketTypes
 import MonadSupply
 import GameState
-import Events
 import Helpers (finallyStateT)
 
 -- these types are all for the server to manage

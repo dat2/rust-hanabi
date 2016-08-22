@@ -9,11 +9,12 @@ npm-debug.log
 .env
 
 # elm stuff
-elm-client/build/*
-elm-client/elm-stuff
+haskell-elm/client/build/*
+haskell-elm/client/elm-stuff
 
 # haskell stuff
 dist
+.stack-work
 
 # os stuff
 .DS_Store

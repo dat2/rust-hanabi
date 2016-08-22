@@ -1,13 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Events where
+module WebSocketTypes where
 
 import Data.Aeson
 import Data.Aeson.TH
 import Data.Text (Text)
 import qualified Data.ByteString.Lazy as B
 
-import GameState
+import GameTypes
 
 data Event =
     SetName Text

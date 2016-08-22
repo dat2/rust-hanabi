@@ -5,7 +5,7 @@ import Json.Encode as E
 import String
 import Date exposing (Date)
 
-import GameState exposing (..)
+import GameTypes exposing (..)
 import DecodeDate exposing (jsonDecDate)
 
 type ClientEvent
